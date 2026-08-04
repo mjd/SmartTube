@@ -70,9 +70,13 @@ jobs:
         # Scoped to the plain-JUnit suites on purpose. A bare './gradlew test' also runs the
         # legacy Robolectric suites, which cannot start under the JDK 17 this build requires
         # (ASM cannot read modern class files) and would fail for reasons unrelated to the code.
+        #
+        # The ':exoplayer-library-core' suite that used to run here is gone: the vendored player is
+        # no longer part of the build, so the task no longer exists and the step failed outright.
+        # ':sabr' replaces it as the second module with tests of its own.
         run: |
           ./gradlew :common:testStbetaDebugUnitTest
-          ./gradlew :exoplayer-library-core:testDebugUnitTest --tests "*MediaCodecRendererTest*"
+          ./gradlew :sabr:testStbetaDebugUnitTest
 
       - name: Upload Test Report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

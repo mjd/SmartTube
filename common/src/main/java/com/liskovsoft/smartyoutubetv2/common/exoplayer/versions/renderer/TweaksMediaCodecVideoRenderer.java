@@ -113,17 +113,11 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
     }
 
     /**
-     * Whether the decoder is a MediaTek hardware VP9 decoder, matched by name across both the
-     * Codec2 ("c2.mtk.vp9.decoder") and legacy OMX ("OMX.MTK.VIDEO.DECODER.VP9") naming schemes.
+     * Whether the decoder is a MediaTek hardware VP9 decoder. The name matching itself lives in
+     * {@link DecoderQuirks}, which is free of player types and therefore unit-testable.
      */
     private static boolean isSuspectMtkVp9Decoder(MediaCodecInfo codecInfo) {
-        if (codecInfo == null || codecInfo.name == null) {
-            return false;
-        }
-
-        String name = codecInfo.name.toLowerCase();
-
-        return (name.startsWith("c2.mtk.") || name.startsWith("omx.mtk.")) && name.contains("vp9");
+        return codecInfo != null && DecoderQuirks.isSuspectMtkVp9Decoder(codecInfo.name);
     }
 
     private void logAdaptation(
