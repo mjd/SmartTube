@@ -154,7 +154,7 @@ public class ExoPlayerInitializer {
         float volume = mPlayerTweaksData.isPlayerAutoVolumeEnabled() ? mPlayerData.getPlayerVolume() * 2.0f : mPlayerData.getPlayerVolume();
         if (volume > 1f && Build.VERSION.SDK_INT >= 19) {
             mVolumeBooster = new VolumeBooster(true, volume, player);
-            player.addAudioListener(mVolumeBooster);
+            player.addListener(mVolumeBooster);
         }
         mVolumeBoost = Math.max(volume, 1f);
     }
@@ -196,7 +196,7 @@ public class ExoPlayerInitializer {
         }
 
         if (mPlayer != null && mVolumeBooster != null) {
-            mPlayer.removeAudioListener(mVolumeBooster);
+            mPlayer.removeListener(mVolumeBooster);
         }
 
         mVolumeBooster = null;

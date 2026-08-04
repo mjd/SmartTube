@@ -39,7 +39,7 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.List;
 
-public class ExoPlayerController implements Player.EventListener {
+public class ExoPlayerController implements Player.Listener {
     private static final String TAG = ExoPlayerController.class.getSimpleName();
     private final Context mContext;
     private final ExoMediaSourceFactory mMediaSourceFactory;
@@ -456,7 +456,7 @@ public class ExoPlayerController implements Player.EventListener {
         }
 
         if (mVolumeBooster != null) {
-            mPlayer.removeAudioListener(mVolumeBooster);
+            mPlayer.removeListener(mVolumeBooster);
             mVolumeBooster = null;
         }
 
@@ -464,7 +464,7 @@ public class ExoPlayerController implements Player.EventListener {
         // also, other 2.0 tracks in 5.1 group is already too loud. so cancel them too.
         if (volume > 1f && !contains51Audio() && Build.VERSION.SDK_INT >= 19) {
             mVolumeBooster = new VolumeBooster(true, volume, null);
-            mPlayer.addAudioListener(mVolumeBooster);
+            mPlayer.addListener(mVolumeBooster);
         }
     }
     
