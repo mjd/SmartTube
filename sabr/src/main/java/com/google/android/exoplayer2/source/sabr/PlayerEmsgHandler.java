@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.source.SampleQueue;
 import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
 import com.google.android.exoplayer2.upstream.Allocator;
+import com.google.android.exoplayer2.upstream.DataReader;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
 
@@ -69,7 +70,7 @@ public final class PlayerEmsgHandler implements Handler.Callback {
         this.allocator = allocator;
 
         manifestPublishTimeToExpiryTimeUs = new TreeMap<>();
-        handler = Util.createHandler(/* callback= */ this);
+        handler = Util.createHandlerForCurrentLooper(/* callback= */ this);
         decoder = new EventMessageDecoder();
     }
 
@@ -182,7 +183,8 @@ public final class PlayerEmsgHandler implements Handler.Callback {
 
     /** Returns a {@link TrackOutput} that emsg messages could be written to. */
     public PlayerTrackEmsgHandler newPlayerTrackEmsgHandler() {
-        return new PlayerTrackEmsgHandler(new SampleQueue(allocator));
+        // SampleQueue's constructor is protected now; createWithoutDrm is the DRM-free factory.
+        return new PlayerTrackEmsgHandler(SampleQueue.createWithoutDrm(allocator));
     }
 
     /** Release this emsg handler. It should not be reused after this call. */
@@ -226,8 +228,13 @@ public final class PlayerEmsgHandler implements Handler.Callback {
         }
 
         @Override
-        public int sampleData(ExtractorInput input, int length, boolean allowEndOfInput) throws IOException, InterruptedException {
-            return sampleQueue.sampleData(input, length, allowEndOfInput);
+        public int sampleData(DataReader input, int length, boolean allowEndOfInput, int sampleDataPart) throws IOException {
+            return sampleQueue.sampleData(input, length, allowEndOfInput, sampleDataPart);
+        }
+
+        @Override
+        public void sampleData(ParsableByteArray data, int length, int sampleDataPart) {
+            sampleQueue.sampleData(data, length, sampleDataPart);
         }
 
         @Override
@@ -280,7 +287,8 @@ public final class PlayerEmsgHandler implements Handler.Callback {
         }
 
         private void parseAndDiscardSamples() {
-            while (sampleQueue.hasNextSample()) {
+            // hasNextSample() is private now; isReady(false) is the public equivalent.
+            while (sampleQueue.isReady(/* loadingFinished= */ false)) {
                 MetadataInputBuffer inputBuffer = dequeueSample();
                 if (inputBuffer == null) {
                     continue;
@@ -305,7 +313,7 @@ public final class PlayerEmsgHandler implements Handler.Callback {
         @Nullable
         private MetadataInputBuffer dequeueSample() {
             buffer.clear();
-            int result = sampleQueue.read(formatHolder, buffer, false, false, 0);
+            int result = sampleQueue.read(formatHolder, buffer, /* readFlags= */ 0, /* loadingFinished= */ false);
             if (result == C.RESULT_BUFFER_READ) {
                 buffer.flip();
                 return buffer;

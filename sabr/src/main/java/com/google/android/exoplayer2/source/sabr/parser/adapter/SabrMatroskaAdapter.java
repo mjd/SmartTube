@@ -24,7 +24,7 @@ public class SabrMatroskaAdapter extends MatroskaExtractor {
 
     @Override
     public int read(ExtractorInput input, PositionHolder seekPosition)
-            throws IOException, InterruptedException {
+            throws IOException {
         int result = RESULT_END_OF_INPUT;
 
         try {

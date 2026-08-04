@@ -42,9 +42,8 @@ public class SabrFragmentedMp4Adapter extends FragmentedMp4Extractor {
             int flags,
             @Nullable TimestampAdjuster timestampAdjuster,
             @Nullable Track sideloadedTrack,
-            @Nullable DrmInitData sideloadedDrmInitData,
             SabrStream sabrStream) {
-        super(flags, timestampAdjuster, sideloadedTrack, sideloadedDrmInitData);
+        super(flags, timestampAdjuster, sideloadedTrack);
         this.extractorInput = new SabrExtractorInput(sabrStream);
     }
 
@@ -52,10 +51,9 @@ public class SabrFragmentedMp4Adapter extends FragmentedMp4Extractor {
             int flags,
             @Nullable TimestampAdjuster timestampAdjuster,
             @Nullable Track sideloadedTrack,
-            @Nullable DrmInitData sideloadedDrmInitData,
             List<Format> closedCaptionFormats,
             SabrStream sabrStream) {
-        super(flags, timestampAdjuster, sideloadedTrack, sideloadedDrmInitData, closedCaptionFormats);
+        super(flags, timestampAdjuster, sideloadedTrack, closedCaptionFormats);
         this.extractorInput = new SabrExtractorInput(sabrStream);
     }
 
@@ -63,17 +61,16 @@ public class SabrFragmentedMp4Adapter extends FragmentedMp4Extractor {
             int flags,
             @Nullable TimestampAdjuster timestampAdjuster,
             @Nullable Track sideloadedTrack,
-            @Nullable DrmInitData sideloadedDrmInitData,
             List<Format> closedCaptionFormats,
             @Nullable TrackOutput additionalEmsgTrackOutput,
             SabrStream sabrStream) {
-        super(flags, timestampAdjuster, sideloadedTrack, sideloadedDrmInitData, closedCaptionFormats, additionalEmsgTrackOutput);
+        super(flags, timestampAdjuster, sideloadedTrack, closedCaptionFormats, additionalEmsgTrackOutput);
         this.extractorInput = new SabrExtractorInput(sabrStream);
     }
 
     @Override
     public int read(ExtractorInput input, PositionHolder seekPosition)
-            throws IOException, InterruptedException {
+            throws IOException {
         int result = RESULT_END_OF_INPUT;
 
         try {

@@ -57,12 +57,12 @@ public final class SabrExtractorInput implements ExtractorInput {
     }
 
     @Override
-    public int read(byte[] buffer, int offset, int length) throws IOException, InterruptedException {
+    public int read(byte[] buffer, int offset, int length) throws IOException {
         return forward(length, newLength -> data.data.read(buffer, offset, newLength));
     }
 
     @Override
-    public void readFully(byte[] buffer, int offset, int length) throws IOException, InterruptedException {
+    public void readFully(byte[] buffer, int offset, int length) throws IOException {
         readFully(buffer, offset, length, false);
     }
 
@@ -71,26 +71,26 @@ public final class SabrExtractorInput implements ExtractorInput {
             byte[] buffer,
             int offset,
             int length,
-            boolean allowEndOfInput) throws IOException, InterruptedException {
+            boolean allowEndOfInput) throws IOException {
         return forwardFully(length,
                 (total, newLength) -> data.data.readFully(buffer, offset + total, newLength, ALLOW_END_OF_INPUT)
         );
     }
 
     @Override
-    public int skip(int length) throws IOException, InterruptedException {
+    public int skip(int length) throws IOException {
         return forward(length, newLength -> data.data.skip(newLength));
     }
 
     @Override
-    public void skipFully(int length) throws IOException, InterruptedException {
+    public void skipFully(int length) throws IOException {
         skipFully(length, false);
     }
 
     @Override
     public boolean skipFully(
             int length,
-            boolean allowEndOfInput) throws IOException, InterruptedException {
+            boolean allowEndOfInput) throws IOException {
         return forwardFully(length,
                 (total, newLength) -> data.data.skipFully(newLength, ALLOW_END_OF_INPUT));
     }
@@ -108,6 +108,17 @@ public final class SabrExtractorInput implements ExtractorInput {
     @Override
     public <E extends Throwable> void setRetryPosition(long p, E e) throws E {
         throwShouldNotBeCalled();
+    }
+
+    /**
+     * Peeking is not supported on a SABR stream: the underlying UMP framing is consumed as it is
+     * read and cannot be rewound. Added when {@code peek} became part of the {@code ExtractorInput}
+     * contract; it joins the other peek methods in refusing rather than silently misbehaving.
+     */
+    @Override
+    public int peek(byte[] target, int offset, int length) {
+        throwShouldNotBeCalled();
+        return 0;
     }
 
     @Override
@@ -189,10 +200,10 @@ public final class SabrExtractorInput implements ExtractorInput {
     }
 
     private interface ForwardCallback {
-        int forward(int newLength) throws IOException, InterruptedException;
+        int forward(int newLength) throws IOException;
     }
 
-    private int forward(int length, ForwardCallback callback) throws IOException, InterruptedException {
+    private int forward(int length, ForwardCallback callback) throws IOException {
         if (remaining == 0) {
             return C.RESULT_END_OF_INPUT;
         }
@@ -210,7 +221,7 @@ public final class SabrExtractorInput implements ExtractorInput {
         return result;
     }
 
-    private int forwardReal(int length, ForwardCallback callback) throws IOException, InterruptedException {
+    private int forwardReal(int length, ForwardCallback callback) throws IOException {
         int result = C.RESULT_END_OF_INPUT;
 
         fetchData();
@@ -230,10 +241,10 @@ public final class SabrExtractorInput implements ExtractorInput {
     }
 
     private interface ForwardFullyCallback {
-        boolean forwardFully(int total, int newLength) throws IOException, InterruptedException;
+        boolean forwardFully(int total, int newLength) throws IOException;
     }
 
-    private boolean forwardFully(int length, ForwardFullyCallback callback) throws IOException, InterruptedException {
+    private boolean forwardFully(int length, ForwardFullyCallback callback) throws IOException {
         boolean exceeded = remaining != C.LENGTH_UNSET && length > remaining;
 
         if (exceeded) {
@@ -253,7 +264,7 @@ public final class SabrExtractorInput implements ExtractorInput {
         return result;
     }
 
-    private boolean forwardFullyReal(int length, ForwardFullyCallback callback) throws IOException, InterruptedException {
+    private boolean forwardFullyReal(int length, ForwardFullyCallback callback) throws IOException {
         boolean result = false;
         int total = 0;
 
