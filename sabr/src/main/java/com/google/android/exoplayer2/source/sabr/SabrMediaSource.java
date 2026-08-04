@@ -8,6 +8,7 @@ import android.util.SparseArray;
 import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.source.BaseMediaSource;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoaderFactory;
@@ -215,7 +216,16 @@ public final class SabrMediaSource extends BaseMediaSource {
                         windowDefaultStartPositionUs,
                         manifest,
                         tag);
-        refreshSourceInfo(timeline, manifest);
+        refreshSourceInfo(timeline);
+    }
+
+    /**
+     * Newly abstract on MediaSource. SABR is always built from a sideloaded manifest rather than a
+     * MediaItem, so this reports a placeholder carrying the source tag.
+     */
+    @Override
+    public MediaItem getMediaItem() {
+        return new MediaItem.Builder().setUri(Uri.EMPTY).setTag(tag).build();
     }
 
     private long getNowUnixTimeUs() {
@@ -226,7 +236,7 @@ public final class SabrMediaSource extends BaseMediaSource {
         }
     }
 
-    public static final class Factory implements AdsMediaSource.MediaSourceFactory {
+    public static final class Factory implements MediaSource.Factory {
         private final SabrChunkSource.Factory chunkSourceFactory;
         @Nullable private final DataSource.Factory manifestDataSourceFactory;
         private LoadErrorHandlingPolicy loadErrorHandlingPolicy;
@@ -256,9 +266,17 @@ public final class SabrMediaSource extends BaseMediaSource {
         }
 
         @Override
-        public MediaSource createMediaSource(Uri uri) {
+        public MediaSource createMediaSource(MediaItem mediaItem) {
+            // SABR is only ever built from a sideloaded manifest; see createMediaSource(SabrManifest).
             return null;
         }
+
+        @Override
+        public MediaSource.Factory setDrmSessionManagerProvider(
+                com.google.android.exoplayer2.drm.DrmSessionManagerProvider provider) {
+            return this; // SABR streams are never DRM protected
+        }
+
 
         /**
          * Returns a new {@link SabrMediaSource} using the current parameters and the specified
@@ -463,22 +481,30 @@ public final class SabrMediaSource extends BaseMediaSource {
         }
 
         @Override
-        public Window getWindow(
-                int windowIndex, Window window, boolean setTag, long defaultPositionProjectionUs) {
+        public Window getWindow(int windowIndex, Window window, long defaultPositionProjectionUs) {
             Assertions.checkIndex(windowIndex, 0, 1);
             long windowDefaultStartPositionUs = getAdjustedWindowDefaultStartPositionUs(
                     defaultPositionProjectionUs);
-            Object tag = setTag ? windowTag : null;
             boolean isDynamic =
                     manifest.dynamic
                             && manifest.minUpdatePeriodMs != C.TIME_UNSET
                             && manifest.durationMs == C.TIME_UNSET;
+            // The window now carries a MediaItem and a LiveConfiguration rather than a bare tag, and
+            // the setTag flag is gone -- the tag rides along inside the MediaItem instead.
+            MediaItem mediaItem = new MediaItem.Builder()
+                    .setUri(Uri.EMPTY)
+                    .setTag(windowTag)
+                    .build();
             return window.set(
-                    tag,
+                    Window.SINGLE_WINDOW_UID,
+                    mediaItem,
+                    manifest,
                     presentationStartTimeMs,
                     windowStartTimeMs,
+                    /* elapsedRealtimeEpochOffsetMs= */ C.TIME_UNSET,
                     /* isSeekable= */ true,
                     isDynamic,
+                    /* liveConfiguration= */ null,
                     windowDefaultStartPositionUs,
                     windowDurationUs,
                     /* firstPeriodIndex= */ 0,

@@ -19,12 +19,7 @@ public class UMPInputStream extends InputStream {
 
         byte[] buffer = new byte[1];
         int read;
-        try {
             read = part.data.read(buffer, 0, 1);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // preserve interrupt status
-            throw new IOException("Interrupted while reading from ExtractorInput", e);
-        }
 
         if (read == C.RESULT_END_OF_INPUT) return -1;
         position += read;
@@ -37,12 +32,7 @@ public class UMPInputStream extends InputStream {
 
         int toRead = Math.min(len, part.size - position);
         int read;
-        try {
             read = part.data.read(b, off, toRead);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while reading from UMPPart", e);
-        }
 
         if (read == C.RESULT_END_OF_INPUT) return -1;
         position += read;
@@ -53,12 +43,7 @@ public class UMPInputStream extends InputStream {
     public long skip(long n) throws IOException {
         int toSkip = (int) Math.min(n, part.size - position);
         int skipped;
-        try {
             skipped = part.data.skip(toSkip);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while skipping in UMPPart", e);
-        }
         position += skipped;
         return skipped;
     }

@@ -10,11 +10,14 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.extractor.Extractor;
+import com.google.android.exoplayer2.extractor.mkv.MatroskaExtractor;
 import com.google.android.exoplayer2.extractor.TrackOutput;
-import com.google.android.exoplayer2.extractor.rawcc.RawCcExtractor;
 import com.google.android.exoplayer2.source.BehindLiveWindowException;
+import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
+import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy.LoadErrorInfo;
 import com.google.android.exoplayer2.source.chunk.Chunk;
-import com.google.android.exoplayer2.source.chunk.ChunkExtractorWrapper;
+import com.google.android.exoplayer2.source.chunk.BundledChunkExtractor;
+import com.google.android.exoplayer2.source.chunk.ChunkExtractor;
 import com.google.android.exoplayer2.source.chunk.ChunkHolder;
 import com.google.android.exoplayer2.source.chunk.ContainerMediaChunk;
 import com.google.android.exoplayer2.source.chunk.InitializationChunk;
@@ -421,7 +424,21 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     @Override
-    public boolean onChunkLoadError(Chunk chunk, boolean cancelable, Exception e, long blacklistDurationMs) {
+    public boolean onChunkLoadError(Chunk chunk, boolean cancelable, LoadErrorInfo loadErrorInfo,
+                                    LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
+        Exception e = loadErrorInfo.exception;
+        // The caller no longer computes an exclusion duration for us; ask the policy, which is the
+        // same one that used to produce the value that was passed in.
+        LoadErrorHandlingPolicy.FallbackSelection fallback =
+                loadErrorHandlingPolicy.getFallbackSelectionFor(
+                        new LoadErrorHandlingPolicy.FallbackOptions(
+                                /* numberOfLocations= */ 1, /* numberOfExcludedLocations= */ 0,
+                                /* numberOfTracks= */ trackSelection.length(),
+                                /* numberOfExcludedTracks= */ 0),
+                        loadErrorInfo);
+        long blacklistDurationMs =
+                fallback != null && fallback.type == LoadErrorHandlingPolicy.FALLBACK_TYPE_TRACK
+                        ? fallback.exclusionDurationMs : C.TIME_UNSET;
         Log.e(TAG, "Chunk load failed: " + e.getMessage());
         if (!cancelable) {
             return false;
@@ -446,7 +463,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //    }
         //}
         return blacklistDurationMs != C.TIME_UNSET
-                && trackSelection.blacklist(trackSelection.indexOf(chunk.trackFormat), blacklistDurationMs);
+                && trackSelection.excludeTrack(trackSelection.indexOf(chunk.trackFormat), blacklistDurationMs); // was blacklist()
     }
 
     private ArrayList<Representation> getRepresentations() {
@@ -752,7 +769,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     /** Holds information about a snapshot of a single {@link Representation}. */
     protected static final class RepresentationHolder {
 
-        /* package */ final @Nullable ChunkExtractorWrapper extractorWrapper;
+        /* package */ final @Nullable ChunkExtractor extractorWrapper;
 
         public final Representation representation;
         //public final @Nullable SabrSegmentIndex segmentIndex;
@@ -786,7 +803,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         private RepresentationHolder(
                 long periodDurationUs,
                 Representation representation,
-                @Nullable ChunkExtractorWrapper extractorWrapper,
+                @Nullable ChunkExtractor extractorWrapper,
                 long segmentNumShift
                 //@Nullable SabrSegmentIndex segmentIndex
         ) {
@@ -931,7 +948,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             return MimeTypes.isText(mimeType) || MimeTypes.APPLICATION_TTML.equals(mimeType);
         }
 
-        private static @Nullable ChunkExtractorWrapper createExtractorWrapper(
+        private static @Nullable ChunkExtractor createExtractorWrapper(
                 int trackType,
                 Representation representation,
                 boolean enableEventMessageTrack,
@@ -961,11 +978,12 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
             //Extractor extractor = new SabrExtractor(trackType, representation.format, sabrStream);
 
+            // RawCcExtractor is no longer in extractor.rawcc. SABR never serves RAWCC -- YouTube
+            // delivers captions as separate text tracks -- so the branch is dropped rather than
+            // chased to its new home.
             Extractor extractor;
-            if (MimeTypes.APPLICATION_RAWCC.equals(containerMimeType)) {
-                extractor = new RawCcExtractor(representation.format);
-            } else if (mimeTypeIsWebm(containerMimeType)) {
-                extractor = new SabrMatroskaAdapter(SabrMatroskaAdapter.FLAG_DISABLE_SEEK_FOR_CUES, sabrStream);
+            if (mimeTypeIsWebm(containerMimeType)) {
+                extractor = new SabrMatroskaAdapter(MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES, sabrStream);
             } else {
                 int flags = 0;
                 if (enableEventMessageTrack) {
@@ -973,12 +991,28 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 }
                 extractor =
                         new SabrFragmentedMp4Adapter(
-                                flags, null, null, null, closedCaptionFormats, playerEmsgTrackOutput, sabrStream);
+                                flags, null, null, closedCaptionFormats, playerEmsgTrackOutput, sabrStream);
             }
 
             // Prefer drmInitData obtained from the manifest over drmInitData obtained from the stream,
             // as per DASH IF Interoperability Recommendations V3.0, 7.5.3.
-            return new ChunkExtractorWrapper(extractor, trackType, representation.format);
+            // ChunkExtractorWrapper became the ChunkExtractor interface; BundledChunkExtractor is
+            // the equivalent implementation that bundles a plain Extractor.
+            return new BundledChunkExtractor(extractor, trackType, representation.format);
         }
+    }
+    /** Newly abstract on ChunkSource. Nothing here owns releasable resources. */
+    @Override
+    public void release() {
+        // NOP
+    }
+
+    /**
+     * Newly abstract on ChunkSource. SABR requests are a protocol exchange rather than plain range
+     * requests, so cancelling one mid-flight would desynchronise the stream; never cancel.
+     */
+    @Override
+    public boolean shouldCancelLoad(long playbackPositionUs, Chunk loadingChunk, List<? extends MediaChunk> queue) {
+        return false;
     }
 }

@@ -146,16 +146,38 @@ for the full dependency set. Fire TV Gen1 and Stick Gen1 are lost after all — 
 was right. Set via `ext.migrationMinSdk` in the root `build.gradle` so the SharedModules submodule
 stays untouched.
 
-### SABR is switched off
+### SABR is ported and back on
 
-`VideoLoaderController.SABR_SUPPORTED = false` skips the SABR branch, so a response offering SABR
-falls through to the live-DASH, HLS and URL-list branches rather than opening a source that cannot
-play. `buildSabrMediaSource` returns null as a second line of defence, and `:common` no longer
-depends on `:sabr`.
+The module compiles (79 errors → 0), `:common` depends on it again, and
+`VideoLoaderController.SABR_SUPPORTED` is back to `true`. The flag stays as a kill switch: SABR is
+the least-tested part of the player, and flipping it is the fastest way to rule it out if playback
+misbehaves.
 
-This is invisible on hardware being served DASH — which is the case on the test TV — but it is a
-real capability gap for anyone YouTube has already migrated to SABR. The module still has 20 errors
-in two files; see the section above.
+The port's substantive pieces:
+
+- **`ChunkExtractorWrapper` → `ChunkExtractor`/`BundledChunkExtractor`** — the redesign the plan
+  flagged, which turned out to be largely a type swap across five sites plus one constructor change
+- **`SabrMatroskaAdapter` moved from inheritance to composition** — `MatroskaExtractor.read` is
+  `final` upstream so it can no longer be overridden. It now delegates through the public
+  `Extractor` interface, which is the better shape regardless: it no longer depends on the
+  extractor's internals. (`FragmentedMp4Extractor.read` is *not* final, so that adapter still
+  extends.)
+- **`Timeline.Window.set` now takes a `MediaItem` and `LiveConfiguration`**, and `getWindow` lost its
+  `setTag` flag — the tag rides inside the `MediaItem` instead
+- **`ChunkSource` gained `release()` and `shouldCancelLoad()`**. SABR never cancels a load: its
+  requests are a protocol exchange rather than plain range requests, so cancelling mid-flight would
+  desynchronise the stream
+- **`onChunkLoadError` now receives a `LoadErrorInfo` and the policy** rather than a precomputed
+  exclusion duration, so the source asks the policy itself
+- **`ExoTrackSelection.blacklist` → `excludeTrack`**; **`RawCcExtractor`** dropped (SABR never serves
+  RAWCC — YouTube delivers captions as separate text tracks)
+- **`lastModified` rides as `Format.metadata`** via `SabrFormatExtras`, since SABR echoes it back in
+  every request's `FormatId` and reads it off a `Format` that has already passed through track
+  selection
+
+**Still entirely unvalidated at runtime.** SABR is dormant on the test TV (YouTube serves DASH), the
+golden-file capture came back empty, and the module has no tests. It compiles and is wired in; that
+is the whole of what is known.
 
 ### Other things now missing or moved, beyond SABR
 

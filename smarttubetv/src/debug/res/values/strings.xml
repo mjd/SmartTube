@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug builds install side-by-side; distinct label to tell them apart on the launcher -->
+    <string translatable="false" name="app_name"><![CDATA[SmartTube Debug]]></string>
+</resources>

@@ -31,15 +31,15 @@ import io.reactivex.disposables.Disposable;
 public class VideoLoaderController extends BasePlayerController {
     private static final String TAG = VideoLoaderController.class.getSimpleName();
     /**
-     * SABR playback is switched off while its module finishes being ported to the new player
-     * (see MIGRATION_STATUS.md).
+     * Kill switch for the SABR path.
      *
-     * <p>Guarding the dispatch rather than stubbing {@code openSabr} keeps the degradation graceful:
-     * the branch is simply skipped, so a response that offers SABR falls through to the live-DASH,
-     * HLS and URL-list branches below instead of opening a source that cannot play. Flip this back
-     * to true when the port lands.
+     * <p>Guarding the dispatch rather than stubbing {@code openSabr} means the degradation is
+     * graceful when off: the branch is skipped, so a response offering SABR falls through to the
+     * live-DASH, HLS and URL-list branches instead of opening a source that cannot play. Kept
+     * because SABR is the least-tested part of the player and this is the fastest way to rule it
+     * out if playback misbehaves.
      */
-    private static final boolean SABR_SUPPORTED = false;
+    private static final boolean SABR_SUPPORTED = true;
     private static final int MIN_SHUFFLE_SIZE = 30;
     private final Playlist mPlaylist;
     private Video mPendingVideo;

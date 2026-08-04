@@ -76,7 +76,7 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
-    // :sabr is excluded until its port completes; see MIGRATION_STATUS.md
+    implementation project(':sabr')
     implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-dash:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-hls:' + rootProject.ext.exoplayerMigrationVersion
