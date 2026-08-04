@@ -15,11 +15,13 @@ apply from: new File(gradle.ext.mediaServiceCoreRoot, 'core_settings.gradle')
 // git submodule
 gradle.ext.exoplayerRoot = new File(rootDir, './exoplayer-amzn-2.10.6')
 gradle.ext.exoplayerModulePrefix = 'exoplayer-'
-apply from: new File(gradle.ext.exoplayerRoot, 'core_settings.gradle')
+// MIGRATION: vendored player replaced by Maven artifacts
+//apply from: new File(gradle.ext.exoplayerRoot, 'core_settings.gradle')
 
 // git submodule
 // gradle.ext.exoplayerRoot = new File(rootDir, '../AmznExoPlayer2.10.6').exists() ? new File(rootDir, '../AmznExoPlayer2.10.6') : new File(rootDir, './AmznExoPlayer2.10.6')
 // gradle.ext.exoplayerModulePrefix = 'exoplayer-'
-// apply from: new File(gradle.ext.exoplayerRoot, 'core_settings.gradle')
+// // MIGRATION: vendored player replaced by Maven artifacts
+//apply from: new File(gradle.ext.exoplayerRoot, 'core_settings.gradle')
 
 

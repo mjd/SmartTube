@@ -42,6 +42,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:' + kotlinCoreXVersion
     implementation 'androidx.constraintlayout:constraintlayout:' + constraintLayoutXVersion
 
-    implementation project(':exoplayer-library-core')
-    implementation project(':exoplayer-library-ui')
+    implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-ui:' + rootProject.ext.exoplayerMigrationVersion
 }

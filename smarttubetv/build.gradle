@@ -194,18 +194,18 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
-    implementation project(':exoplayer-library-core')
-    implementation project(':exoplayer-library-ui')
-    implementation project(':exoplayer-extension-leanback')
-    implementation project(':exoplayer-extension-mediasession')
+    implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-ui:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-leanback:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-mediasession:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.amazon.android:exoplayer:' + amazonExoplayerVersion
     // implementation 'com.amazon.android:extension-leanback:' + amazonExoplayerVersion
     // implementation 'com.amazon.android:extension-mediasession:' + amazonExoplayerVersion
 
-    // implementation 'com.google.android.exoplayer:exoplayer:' + exoplayerVersion
-    // implementation 'com.google.android.exoplayer:extension-leanback:' + exoplayerVersion
-    // implementation 'com.google.android.exoplayer:extension-mediasession:' + exoplayerVersion
+    // implementation 'com.google.android.exoplayer:exoplayer:' + rootProject.ext.exoplayerMigrationVersion
+    // implementation 'com.google.android.exoplayer:extension-leanback:' + rootProject.ext.exoplayerMigrationVersion
+    // implementation 'com.google.android.exoplayer:extension-mediasession:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.github.amzn:exoplayer-amazon-port:' + amazonExoplayerJitpackVersion
 
