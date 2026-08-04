@@ -15,6 +15,8 @@ import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
+import com.google.android.exoplayer2.drm.DrmSessionEventListener;
+import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
@@ -171,7 +173,8 @@ final class SabrMediaPeriod
     @Override
     public long readDiscontinuity() {
         if (!notifiedReadingStarted) {
-            eventDispatcher.readingStarted();
+            // MediaSourceEventListener.EventDispatcher no longer reports reading-started; the
+            // player derives it from the media period itself.
             notifiedReadingStarted = true;
         }
         return C.TIME_UNSET;
@@ -206,6 +209,12 @@ final class SabrMediaPeriod
     @Override
     public long getNextLoadPositionUs() {
         return compositeSequenceableLoader.getNextLoadPositionUs();
+    }
+
+    /** Newly abstract on MediaPeriod; delegated like the rest of the loader surface. */
+    @Override
+    public boolean isLoading() {
+        return compositeSequenceableLoader.isLoading();
     }
 
     @Override
@@ -256,7 +265,7 @@ final class SabrMediaPeriod
             sampleStream.release(this);
         }
         callback = null;
-        eventDispatcher.mediaPeriodReleased();
+        // mediaPeriodReleased() was likewise dropped from the event dispatcher.
     }
 
     @SuppressWarnings("unchecked")
@@ -386,8 +395,10 @@ final class SabrMediaPeriod
                             eventMessageTrackGroupIndex,
                             cea608TrackGroupIndex);
             if (eventMessageTrackGroupIndex != C.INDEX_UNSET) {
-                Format format = Format.createSampleFormat(firstAdaptationSet.id + ":emsg",
-                        MimeTypes.APPLICATION_EMSG, null, Format.NO_VALUE, null);
+                Format format = new Format.Builder()
+                        .setId(firstAdaptationSet.id + ":emsg")
+                        .setSampleMimeType(MimeTypes.APPLICATION_EMSG)
+                        .build();
                 trackGroups[eventMessageTrackGroupIndex] = new TrackGroup(format);
                 trackGroupInfos[eventMessageTrackGroupIndex] =
                         TrackGroupInfo.embeddedEmsgTrack(adaptationSetIndices, primaryTrackGroupIndex);
@@ -596,6 +607,10 @@ final class SabrMediaPeriod
                         this,
                         allocator,
                         positionUs,
+                        // DRM became explicit constructor arguments; SABR streams are never
+                        // protected, so the no-op manager and an empty dispatcher are passed.
+                        DrmSessionManager.DRM_UNSUPPORTED,
+                        new DrmSessionEventListener.EventDispatcher(),
                         loadErrorHandlingPolicy,
                         eventDispatcher);
         synchronized (this) {

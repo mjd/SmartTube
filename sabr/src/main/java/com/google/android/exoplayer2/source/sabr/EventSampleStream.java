@@ -97,8 +97,9 @@ import java.io.IOException;
   }
 
   @Override
-  public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
-      boolean formatRequired) {
+  public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer, int readFlags) {
+    // The formatRequired boolean became a flags int.
+    boolean formatRequired = (readFlags & FLAG_REQUIRE_FORMAT) != 0;
     if (formatRequired || !isFormatSentDownstream) {
       formatHolder.format = upstreamFormat;
       isFormatSentDownstream = true;
