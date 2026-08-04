@@ -6,11 +6,12 @@ import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.ext.cronet.CronetDataSourceFactory;
+import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.ext.cronet.CronetDataSource;
 import com.google.android.exoplayer2.ext.cronet.CronetEngineWrapper;
-import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSourceFactory;
+import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSource;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
-import com.google.android.exoplayer2.source.ExtractorMediaSource;
+import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -20,6 +21,7 @@ import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser2;
 import com.google.android.exoplayer2.source.dash.manifest.Period;
 import com.google.android.exoplayer2.source.dash.manifest.ProgramInformation;
+import com.google.android.exoplayer2.source.dash.manifest.ServiceDescriptionElement;
 import com.google.android.exoplayer2.source.dash.manifest.UtcTimingElement;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.sabr.DefaultSabrChunkSource;
@@ -33,9 +35,8 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSource.Factory;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
-import com.google.android.exoplayer2.upstream.HttpDataSource.BaseFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.sharedutils.cronet.CronetManager;
@@ -62,7 +63,7 @@ public class ExoMediaSourceFactory {
     private static final int MAX_SEGMENTS_PER_LOAD = 1; // default - 1 (1-5)
     private static final String USER_AGENT = DefaultHeaders.APP_USER_AGENT;
     @SuppressLint("StaticFieldLeak")
-    private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+    private static DefaultBandwidthMeter BANDWIDTH_METER; // built lazily: the no-arg ctor was removed, the builder needs a Context
     private final Context mContext;
     private static final Uri DASH_MANIFEST_URI = Uri.parse("https://example.com/test.mpd");
     private static final String DASH_MANIFEST_EXTENSION = "mpd";
@@ -138,18 +139,18 @@ public class ExoMediaSourceFactory {
     private MediaSource buildMediaSource(Uri uri, String overrideExtension) {
         int type = TextUtils.isEmpty(overrideExtension) ? Util.inferContentType(uri) : Util.inferContentType("." + overrideExtension);
         switch (type) {
-            case C.TYPE_SS:
+            case C.CONTENT_TYPE_SS:
                 SsMediaSource ssSource =
                         new SsMediaSource.Factory(
                                 getSsChunkSourceFactory(),
                                 getMediaDataSourceFactory()
                         )
-                                .createMediaSource(uri);
+                                .createMediaSource(MediaItem.fromUri(uri));
                 if (mTrackErrorFixer != null) {
                     ssSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
                 }
                 return ssSource;
-            case C.TYPE_DASH:
+            case C.CONTENT_TYPE_DASH:
                 DashMediaSource dashSource =
                         new DashMediaSource.Factory(
                                 getDashChunkSourceFactory(),
@@ -157,21 +158,22 @@ public class ExoMediaSourceFactory {
                         )
                                 .setManifestParser(new LiveDashManifestParser()) // Don't make static! Need state reset for each live source.
                                 .setLoadErrorHandlingPolicy(new DashDefaultLoadErrorHandlingPolicy())
-                                .createMediaSource(uri);
+                                .createMediaSource(MediaItem.fromUri(uri));
                 if (mTrackErrorFixer != null) {
                     dashSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
                 }
                 return dashSource;
-            case C.TYPE_HLS:
-                HlsMediaSource hlsSource = new HlsMediaSource.Factory(getMediaDataSourceFactory()).createMediaSource(uri);
+            case C.CONTENT_TYPE_HLS:
+                HlsMediaSource hlsSource = new HlsMediaSource.Factory(getMediaDataSourceFactory()).createMediaSource(MediaItem.fromUri(uri));
                 if (mTrackErrorFixer != null) {
                     hlsSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
                 }
                 return hlsSource;
-            case C.TYPE_OTHER:
-                ExtractorMediaSource extractorSource = new ExtractorMediaSource.Factory(getMediaDataSourceFactory())
-                        .setExtractorsFactory(new DefaultExtractorsFactory())
-                        .createMediaSource(uri);
+            case C.CONTENT_TYPE_OTHER:
+                // setExtractorsFactory() is gone; the extractors factory is a constructor argument.
+                ProgressiveMediaSource extractorSource =
+                        new ProgressiveMediaSource.Factory(getMediaDataSourceFactory(), new DefaultExtractorsFactory())
+                                .createMediaSource(MediaItem.fromUri(uri));
                 if (mTrackErrorFixer != null) {
                     extractorSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
                 }
@@ -278,23 +280,31 @@ public class ExoMediaSourceFactory {
      * Use OkHttp for networking
      */
     private HttpDataSource.Factory buildOkHttpDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
-        OkHttpDataSourceFactory dataSourceFactory = new OkHttpDataSourceFactory(OkHttpManager.instance().getClient(), USER_AGENT,
-                bandwidthMeter);
+        OkHttpDataSource.Factory dataSourceFactory = new OkHttpDataSource.Factory(OkHttpManager.instance().getClient())
+                .setUserAgent(USER_AGENT);
+
+        if (bandwidthMeter != null) {
+            dataSourceFactory.setTransferListener(bandwidthMeter);
+        }
+
         addCommonHeaders(dataSourceFactory);
         return dataSourceFactory;
     }
 
     private HttpDataSource.Factory buildCronetDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
-        CronetDataSourceFactory dataSourceFactory =
-                new CronetDataSourceFactory(
+        CronetDataSource.Factory dataSourceFactory =
+                new CronetDataSource.Factory(
                         new CronetEngineWrapper(CronetManager.getEngine(mContext)),
-                        Executors.newSingleThreadExecutor(),
-                        null,
-                        bandwidthMeter,
-                        (int) OkHttpManager.getConnectTimeoutMs(),
-                        (int) OkHttpManager.getReadTimeoutMs(),
-                        true,
-                        USER_AGENT);
+                        Executors.newSingleThreadExecutor())
+                        .setConnectionTimeoutMs((int) OkHttpManager.getConnectTimeoutMs())
+                        .setReadTimeoutMs((int) OkHttpManager.getReadTimeoutMs())
+                        .setHandleSetCookieRequests(true)
+                        .setUserAgent(USER_AGENT);
+
+        if (bandwidthMeter != null) {
+            dataSourceFactory.setTransferListener(bandwidthMeter);
+        }
+
         addCommonHeaders(dataSourceFactory);
         return dataSourceFactory;
     }
@@ -303,15 +313,23 @@ public class ExoMediaSourceFactory {
      * Use built-in component for networking
      */
     private HttpDataSource.Factory buildDefaultHttpDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
-        DefaultHttpDataSourceFactory dataSourceFactory = new DefaultHttpDataSourceFactory(
-                USER_AGENT, bandwidthMeter, (int) OkHttpManager.getConnectTimeoutMs(),
-                (int) OkHttpManager.getReadTimeoutMs(), true); // allowCrossProtocolRedirects = true
+        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory()
+                .setUserAgent(USER_AGENT)
+                .setConnectTimeoutMs((int) OkHttpManager.getConnectTimeoutMs())
+                .setReadTimeoutMs((int) OkHttpManager.getReadTimeoutMs())
+                .setAllowCrossProtocolRedirects(true);
+
+        if (bandwidthMeter != null) {
+            dataSourceFactory.setTransferListener(bandwidthMeter);
+        }
 
         addCommonHeaders(dataSourceFactory); // cause troubles for some users
         return dataSourceFactory;
     }
 
-    private static void addCommonHeaders(BaseFactory dataSourceFactory) {
+    // HttpDataSource.BaseFactory was removed upstream; every factory here implements
+    // HttpDataSource.Factory, and this body is entirely commented out anyway.
+    private static void addCommonHeaders(HttpDataSource.Factory dataSourceFactory) {
         // Doesn't work
         // Trying to fix 429 error (too many requests)
         //String authorization = RetrofitOkHttpHelper.getAuthHeaders().get("Authorization");
@@ -384,6 +402,7 @@ public class ExoMediaSourceFactory {
 
     // EXO: 2.10 - 2.12
     private static class StaticDashManifestParser extends DashManifestParser {
+        // A ServiceDescriptionElement was added to both the hook and the manifest constructor.
         @Override
         protected DashManifest buildMediaPresentationDescription(
                 long availabilityStartTime,
@@ -396,19 +415,21 @@ public class ExoMediaSourceFactory {
                 long publishTimeMs,
                 ProgramInformation programInformation,
                 UtcTimingElement utcTiming,
+                ServiceDescriptionElement serviceDescription,
                 Uri location,
                 List<Period> periods) {
             return new DashManifest(
                     availabilityStartTime,
                     durationMs,
                     minBufferTimeMs,
-                    false,
+                    false, // force static: this parser exists to stop a side-loaded MPD being treated as live
                     minUpdateTimeMs,
                     timeShiftBufferDepthMs,
                     suggestedPresentationDelayMs,
                     publishTimeMs,
                     programInformation,
                     utcTiming,
+                    serviceDescription,
                     location,
                     periods);
         }
