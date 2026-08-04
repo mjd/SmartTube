@@ -9,8 +9,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.MediaCodecAudioRenderer;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
+import com.google.android.exoplayer2.mediacodec.MediaCodecAdapter;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 
@@ -30,20 +29,12 @@ public class DelayMediaCodecAudioRenderer extends MediaCodecAudioRenderer {
     //    super(context, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys, eventHandler, eventListener, audioSink);
     //}
 
-    // Exo 2.10, 2.11
+    // Exo 2.12+ (DRM parameters dropped from renderer constructors upstream)
     public DelayMediaCodecAudioRenderer(Context context, MediaCodecSelector mediaCodecSelector,
-                                        @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
-                                        boolean playClearSamplesWithoutKeys, boolean enableDecoderFallback, @Nullable Handler eventHandler,
+                                        boolean enableDecoderFallback, @Nullable Handler eventHandler,
                                         @Nullable AudioRendererEventListener eventListener, AudioSink audioSink) {
-        super(context, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys, enableDecoderFallback, eventHandler, eventListener, audioSink);
+        super(context, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink);
     }
-
-    // Exo 2.12, 2.13
-    //public DelayMediaCodecAudioRenderer(Context context, MediaCodecSelector mediaCodecSelector,
-    //                                        boolean enableDecoderFallback, @Nullable Handler eventHandler,
-    //                                        @Nullable AudioRendererEventListener eventListener, AudioSink audioSink) {
-    //    super(context, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink);
-    //}
 
     @Override
     public long getPositionUs() {
@@ -59,10 +50,11 @@ public class DelayMediaCodecAudioRenderer extends MediaCodecAudioRenderer {
     }
 
     @Override
-    protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec, ByteBuffer buffer, int bufferIndex,
-                                          int bufferFlags, long bufferPresentationTimeUs, boolean isDecodeOnlyBuffer, boolean isLastBuffer, Format format) throws ExoPlaybackException {
+    protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodecAdapter codec, ByteBuffer buffer, int bufferIndex,
+                                          int bufferFlags, int sampleCount, long bufferPresentationTimeUs, boolean isDecodeOnlyBuffer,
+                                          boolean isLastBuffer, Format format) throws ExoPlaybackException {
         boolean result = super.processOutputBuffer(
-                positionUs, elapsedRealtimeUs, codec, buffer, bufferIndex, bufferFlags,
+                positionUs, elapsedRealtimeUs, codec, buffer, bufferIndex, bufferFlags, sampleCount,
                 bufferPresentationTimeUs, isDecodeOnlyBuffer, isLastBuffer, format
         );
 

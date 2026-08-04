@@ -9,8 +9,6 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.video.MediaCodecVideoRenderer;
@@ -32,18 +30,13 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
     //            maxDroppedFramesToNotify);
     //}
 
-    // Exo 2.10, 2.11
+    // Exo 2.12+ (DRM session manager and playClearSamplesWithoutKeys were dropped from the renderer
+    // constructors upstream; DRM moved to the MediaSource).
     public DebugInfoMediaCodecVideoRenderer(Context context, MediaCodecSelector mediaCodecSelector, long allowedJoiningTimeMs,
-                                            @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager, boolean playClearSamplesWithoutKeys, boolean enableDecoderFallback, @Nullable Handler eventHandler, @Nullable VideoRendererEventListener eventListener, int maxDroppedFramesToNotify) {
-        super(context, mediaCodecSelector, allowedJoiningTimeMs, drmSessionManager, playClearSamplesWithoutKeys, enableDecoderFallback, eventHandler, eventListener, maxDroppedFramesToNotify);
+                                            boolean enableDecoderFallback, @Nullable Handler eventHandler,
+                                            @Nullable VideoRendererEventListener eventListener, int maxDroppedFramesToNotify) {
+        super(context, mediaCodecSelector, allowedJoiningTimeMs, enableDecoderFallback, eventHandler, eventListener, maxDroppedFramesToNotify);
     }
-
-    // Exo 2.12, 2.13
-    //public DebugInfoMediaCodecVideoRenderer(Context context, MediaCodecSelector mediaCodecSelector, long allowedJoiningTimeMs,
-    //                                     boolean enableDecoderFallback, @Nullable Handler eventHandler,
-    //                                     @Nullable VideoRendererEventListener eventListener, int maxDroppedFramesToNotify) {
-    //    super(context, mediaCodecSelector, allowedJoiningTimeMs, enableDecoderFallback, eventHandler, eventListener, maxDroppedFramesToNotify);
-    //}
 
     @Override
     protected CodecMaxValues getCodecMaxValues(
