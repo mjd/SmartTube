@@ -4,7 +4,9 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.media.MediaCodec;
 import android.os.Handler;
+import android.os.SystemClock;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
@@ -18,6 +20,8 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
     private boolean mIsFrameDropFixEnabled;
     private boolean mIsFrameDropSonyFixEnabled;
     private boolean mIsAmlogicFixEnabled;
+    private boolean mIsMtkVp9AdaptationFixEnabled;
+    private long mLastAdaptationMs = C.TIME_UNSET;
 
     // Exo 2.9
     //public CustomMediaCodecVideoRenderer(Context context, MediaCodecSelector mediaCodecSelector, long allowedJoiningTimeMs,
@@ -81,6 +85,78 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
     }
 
     /**
+     * Seamless adaptation guard for MediaTek hardware VP9 decoders.
+     *
+     * <p>ExoPlayer normally keeps a live codec instance across an adaptive resolution change
+     * (seamless adaptation), trusting the decoder's self-declared "adaptive" capability. Some
+     * MediaTek VP9 decoders mishandle that and fault with a message-less IllegalStateException from
+     * native MediaCodec deep into playback. Returning KEEP_CODEC_RESULT_NO forces a full codec
+     * re-init on the resolution change instead, which is a ~50ms hitch rather than a decoder fault.
+     *
+     * <p>This also logs every adaptation decision so the correlation between adaptations and
+     * decoder faults can be confirmed on-device.
+     */
+    @Override
+    protected @KeepCodecResult int canKeepCodec(
+            MediaCodec codec, MediaCodecInfo codecInfo, Format oldFormat, Format newFormat) {
+        @KeepCodecResult int result = super.canKeepCodec(codec, codecInfo, oldFormat, newFormat);
+
+        boolean resolutionChanged =
+                oldFormat.width != newFormat.width || oldFormat.height != newFormat.height;
+
+        boolean guardApplied = mIsMtkVp9AdaptationFixEnabled
+                && result != KEEP_CODEC_RESULT_NO
+                && resolutionChanged
+                && isSuspectMtkVp9Decoder(codecInfo);
+
+        if (guardApplied) {
+            result = KEEP_CODEC_RESULT_NO;
+        }
+
+        logAdaptation(codecInfo, oldFormat, newFormat, result, guardApplied);
+
+        return result;
+    }
+
+    /**
+     * Whether the decoder is a MediaTek hardware VP9 decoder, matched by name across both the
+     * Codec2 ("c2.mtk.vp9.decoder") and legacy OMX ("OMX.MTK.VIDEO.DECODER.VP9") naming schemes.
+     */
+    private static boolean isSuspectMtkVp9Decoder(MediaCodecInfo codecInfo) {
+        if (codecInfo == null || codecInfo.name == null) {
+            return false;
+        }
+
+        String name = codecInfo.name.toLowerCase();
+
+        return (name.startsWith("c2.mtk.") || name.startsWith("omx.mtk.")) && name.contains("vp9");
+    }
+
+    private void logAdaptation(
+            MediaCodecInfo codecInfo, Format oldFormat, Format newFormat,
+            @KeepCodecResult int result, boolean guardApplied) {
+        long nowMs = SystemClock.elapsedRealtime();
+        long sinceLastMs = mLastAdaptationMs == C.TIME_UNSET ? -1 : nowMs - mLastAdaptationMs;
+        mLastAdaptationMs = nowMs;
+
+        Log.d(TAG, "Codec adaptation: %s | %s -> %s | keepCodec=%s%s | sinceLastMs=%s",
+                codecInfo != null ? codecInfo.name : "unknown",
+                formatToString(oldFormat),
+                formatToString(newFormat),
+                result,
+                guardApplied ? " (MTK VP9 fix forced reinit)" : "",
+                sinceLastMs);
+    }
+
+    private static String formatToString(Format format) {
+        if (format == null) {
+            return "null";
+        }
+
+        return format.width + "x" + format.height + "@" + format.frameRate + " " + format.codecs;
+    }
+
+    /**
      * Frame drop fixes on Sony Bravia<br/>
      * https://github.com/google/ExoPlayer/issues/6348#issuecomment-718986083
      */
@@ -116,5 +192,9 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
 
     public void enableAmlogicFix(boolean enabled) {
         mIsAmlogicFixEnabled = enabled;
+    }
+
+    public void enableMtkVp9AdaptationFix(boolean enabled) {
+        mIsMtkVp9AdaptationFixEnabled = enabled;
     }
 }

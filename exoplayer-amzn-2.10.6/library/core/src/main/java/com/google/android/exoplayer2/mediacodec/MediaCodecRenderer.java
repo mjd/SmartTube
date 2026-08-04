@@ -758,9 +758,22 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    */
   private ExoPlaybackException createDecoderException(IllegalStateException error) {
     String diagnosticInfo = getCodecDiagnosticInfo(error);
-    String message = "MediaCodec decoder error (" + codecName + ")"
+    String message = "MediaCodec decoder error (" + getDecoderName() + ")"
         + (diagnosticInfo != null ? ": " + diagnosticInfo : "");
     return ExoPlaybackException.createForUnexpected(new IllegalStateException(message, error));
+  }
+
+  /**
+   * Returns the name of the decoder currently in use, or {@code "unknown"} if no codec is
+   * initialized.
+   *
+   * <p>Note this deliberately reads {@link #getCodecInfo()} rather than the {@link #codecName}
+   * field: that field is only ever initialized to a placeholder and never assigned (the value in
+   * {@code initCodec} is a shadowing local), so it always reads back as "CodecNameUnknown".
+   */
+  private String getDecoderName() {
+    MediaCodecInfo info = getCodecInfo();
+    return info != null ? info.name : "unknown";
   }
 
   private static String getCodecDiagnosticInfo(IllegalStateException error) {

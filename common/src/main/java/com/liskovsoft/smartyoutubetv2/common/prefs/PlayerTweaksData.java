@@ -56,6 +56,7 @@ public class PlayerTweaksData implements ProfileChangeListener {
     private boolean mIsAmlogicFixEnabled;
     private boolean mIsAmazonFrameDropFixEnabled;
     private boolean mIsSonyFrameDropFixEnabled;
+    private boolean mIsMtkVp9AdaptationFixEnabled;
     private boolean mIsSnapToVsyncDisabled;
     private boolean mIsProfileLevelCheckSkipped;
     private boolean mIsSWDecoderForced;
@@ -131,6 +132,15 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
     public void setAmlogicFixEnabled(boolean enable) {
         mIsAmlogicFixEnabled = enable;
+        persistData();
+    }
+
+    public boolean isMtkVp9AdaptationFixEnabled() {
+        return mIsMtkVp9AdaptationFixEnabled;
+    }
+
+    public void setMtkVp9AdaptationFixEnabled(boolean enable) {
+        mIsMtkVp9AdaptationFixEnabled = enable;
         persistData();
     }
 
@@ -762,6 +772,10 @@ public class PlayerTweaksData implements ProfileChangeListener {
         mIsQuickSkipVideosAltEnabled = Helpers.parseBoolean(split, 58, false);
         mIsAudioTimeStretchingEnabled = Helpers.parseBoolean(split, 59, true);
         mIsQueueRespectsPlaybackMode = Helpers.parseBoolean(split, 60, false);
+        // Off by default: forcing a codec re-init costs ~170ms of decoder teardown/start plus a
+        // keyframe resume, and it isn't yet confirmed that seamless adaptation is what provokes the
+        // MediaTek VP9 decoder fault. Opt-in until there's evidence.
+        mIsMtkVp9AdaptationFixEnabled = Helpers.parseBoolean(split, 61, false);
 
         updateDefaultValues();
     }
@@ -789,7 +803,8 @@ public class PlayerTweaksData implements ProfileChangeListener {
                 mIsUnsafeAudioFormatsEnabled, null, mIsLoopShortsEnabled, mIsQuickSkipShortsEnabled, mIsRememberPositionOfLiveVideosEnabled,
                 mIsOculusQuestFixEnabled, null, mIsExtraLongSpeedListEnabled, mIsQuickSkipVideosEnabled, mIsNetworkErrorFixingDisabled, mIsCommentsPlacedLeft,
                 null, mIsAudioFocusEnabled, mIsDontResizeVideoToFitDialogEnabled, mIsSuggestionsHorizontallyScrolled,
-                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode
+                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode,
+                mIsMtkVp9AdaptationFixEnabled
                 ));
     }
 
