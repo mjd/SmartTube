@@ -3,7 +3,7 @@ package com.google.android.exoplayer2.source.sabr.parser.models;
 import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.source.sabr.manifest.SabrFormatExtras;
+import com.liskovsoft.smartyoutubetv2.player.extras.FormatExtras;
 import com.google.android.exoplayer2.source.sabr.protos.misc.FormatId;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 
@@ -67,8 +67,8 @@ public class FormatSelector {
     private static FormatId createFormatId(Format format) {
         FormatId formatId = FormatId.newBuilder()
                 .setItag(Helpers.parseInt(format.id))
-                // lastModified now rides along as Metadata; see SabrFormatExtras.
-                .setLastModified(SabrFormatExtras.getLastModified(format.metadata, Format.NO_VALUE))
+                // lastModified now rides along as Metadata; see FormatExtras.
+                .setLastModified(FormatExtras.getLastModified(format.metadata, Format.NO_VALUE))
                 .build();
         return formatId;
     }

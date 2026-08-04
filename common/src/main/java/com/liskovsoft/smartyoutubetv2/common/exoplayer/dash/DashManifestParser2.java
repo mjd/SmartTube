@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
-import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatExtras;
+import com.liskovsoft.smartyoutubetv2.player.extras.FormatExtras;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
@@ -538,7 +538,7 @@ public class DashManifestParser2 {
                 .setSelectionFlags(selectionFlags)
                 .setRoleFlags(roleFlags)
                 .setLanguage(language)
-                .setMetadata(new Metadata(new FormatExtras(isDrc)));
+                .setMetadata(new Metadata(new FormatExtras(isDrc, lastModified)));
 
         if (sampleMimeType != null) {
             if (MimeTypes.isVideo(sampleMimeType)) {
