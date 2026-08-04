@@ -71,3 +71,6 @@ allprojects {
 // MIGRATION: player version for the Maven-consumed ExoPlayer.
 // Defined here rather than in the SharedModules submodule, which is a separate repo.
 ext.exoplayerMigrationVersion = '2.19.1'
+// Was defined in the vendored player's constants.gradle, which is going away.
+// 3.17.3 is the last protobuf-javalite that still supports Android 4.
+ext.protobufVersion = '3.17.3'

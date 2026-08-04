@@ -76,6 +76,7 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
+    implementation project(':sabr')
     implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-dash:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-hls:' + rootProject.ext.exoplayerMigrationVersion

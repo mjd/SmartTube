@@ -82,3 +82,45 @@ The vendored tree is still on disk. It is deleted once nothing references it.
   modifying the player itself.
 - `2.19.1` resolved and its transitive dependencies are consistent with the existing AndroidX
   versions — no dependency conflicts appeared.
+
+---
+
+## SABR module promotion (in progress)
+
+`library/sabr` is now a first-party module at `sabr/`, registered in `settings.gradle` and depended
+on by `:common`. Protobuf generation works (28 `.proto` files), so the module builds up to Java
+compilation.
+
+The package is deliberately still `com.google.android.exoplayer2.source.sabr`. Nothing is split --
+that package is ours alone, the player never defines it -- and keeping it avoids rewriting imports
+across 63 files while the API port is in flight. Renaming to a `liskovsoft` package is a follow-up,
+as is the `protocol`/`exo` split the plan calls for.
+
+`protobufVersion` moved to the root `build.gradle` alongside `exoplayerMigrationVersion`, since the
+vendored player's `constants.gradle` is going away.
+
+### Measured port surface: 79 errors
+
+| Errors | File |
+|---:|---|
+| 23 | `DefaultSabrChunkSource.java` |
+| 8 | `SabrMediaSource.java` |
+| 7 | `parser/misc/SabrExtractorInput.java` |
+| 6 | `SabrMediaPeriod.java` |
+| 6 | `PlayerEmsgHandler.java` |
+| 6 | `manifest/SabrManifestParser.java` |
+| 5 | `parser/frames/AVCFrameExtractor.java` |
+| ~18 | the remaining `parser/` files, 1-4 each |
+
+This matches the plan's prediction closely: the four plumbing files
+(`DefaultSabrChunkSource`, `SabrMediaSource`, `SabrMediaPeriod`, `PlayerEmsgHandler`) account for 43
+of the 79, and the `parser/` tree -- the protocol logic that was supposed to be nearly portable --
+needs only small mechanical fixes.
+
+Dominant causes:
+- **`TrackSelection` was split.** `getSelectedFormat`, `getSelectionReason`, `getSelectionData`,
+  `getSelectedIndex`, `updateSelectedTrack`, `evaluateQueueSize`, `blacklist` and friends moved to
+  `ExoTrackSelection`; `TrackSelection` itself is now a minimal interface. ~14 errors.
+- **`ChunkExtractorWrapper` no longer exists** (5 errors) -- replaced by the `ChunkExtractor`
+  interface and `BundledChunkExtractor`. The genuine redesign in this port.
+- **`Format` factories and the vendored `lastModified` field**, same as everywhere else.
