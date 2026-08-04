@@ -12,6 +12,8 @@ import androidx.annotation.NonNull;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatExtras;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.common.collect.ImmutableList;
@@ -521,9 +523,10 @@ public class DashManifestParser2 {
         // which also collapses the video/audio/text/plain variants into a single chain -- unset
         // fields simply keep their defaults.
         //
-        // NOTE: isDrc and lastModified are dropped. They were extra fields on the vendored player's
-        // Format and cannot exist on a published artifact (see PLAYER_DELTAS.md). lastModified was
-        // only ever read by SABR; DRC is now derived from the format id suffix.
+        // isDrc rides as Metadata rather than the extra Format field the vendored player had --
+        // rewriting the id to carry a "-drc" suffix would invalidate saved audio preferences, since
+        // the id is field 3 of the persisted string. lastModified is dropped: only SABR read it, and
+        // SABR has its own parser.
         Format.Builder builder = new Format.Builder()
                 .setId(id)
                 .setLabel(label)
@@ -534,7 +537,8 @@ public class DashManifestParser2 {
                 .setPeakBitrate(bitrate)
                 .setSelectionFlags(selectionFlags)
                 .setRoleFlags(roleFlags)
-                .setLanguage(language);
+                .setLanguage(language)
+                .setMetadata(new Metadata(new FormatExtras(isDrc)));
 
         if (sampleMimeType != null) {
             if (MimeTypes.isVideo(sampleMimeType)) {

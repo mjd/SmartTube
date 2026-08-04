@@ -5,6 +5,9 @@ import android.content.Context;
 import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.NonNull;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.dash.VisitorCookieResolver;
+import com.google.android.exoplayer2.upstream.ResolvingDataSource;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ext.cronet.CronetDataSource;
@@ -200,7 +203,7 @@ public class ExoMediaSourceFactory {
     private MediaSource buildDashMediaSource(MediaItemFormatInfo formatInfo) {
         // Are you using FrameworkSampleSource or ExtractorSampleSource when you build your player?
         DashMediaSource dashSource = new DashMediaSource.Factory(
-                getDashChunkSourceFactory(),
+                getDashChunkSourceFactory(formatInfo.getVisitorCookie()),
                 null
         )
                 .setLoadErrorHandlingPolicy(new DashDefaultLoadErrorHandlingPolicy())
@@ -388,7 +391,23 @@ public class ExoMediaSourceFactory {
 
     @NonNull
     private DashChunkSource.Factory getDashChunkSourceFactory() {
-        return new DefaultDashChunkSource.Factory(getMediaDataSourceFactory(), MAX_SEGMENTS_PER_LOAD);
+        return getDashChunkSourceFactory(null);
+    }
+
+    /**
+     * @param visitorCookie YouTube's visitor cookie, or null. Subtitle segments are bot-checked and
+     *                      fail silently without it; see {@link VisitorCookieResolver}.
+     */
+    @NonNull
+    private DashChunkSource.Factory getDashChunkSourceFactory(@Nullable String visitorCookie) {
+        DataSource.Factory dataSourceFactory = getMediaDataSourceFactory();
+
+        if (visitorCookie != null) {
+            dataSourceFactory = new ResolvingDataSource.Factory(
+                    dataSourceFactory, new VisitorCookieResolver(visitorCookie));
+        }
+
+        return new DefaultDashChunkSource.Factory(dataSourceFactory, MAX_SEGMENTS_PER_LOAD);
     }
 
     private Factory getMediaDataSourceFactory() {

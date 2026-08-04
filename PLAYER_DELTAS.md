@@ -59,8 +59,8 @@ These are genuine SmartTube behaviour. None require forking Media3.
 | `ext/cronet/CronetDataSource.java` | — | Same header change | **DROP** — native |
 | `ext/okhttp/OkHttpDataSource.java` | — | Same header change | **DROP** — native |
 | `ext/cronet/CronetEngineWrapper.java` | — | QUIC enable; noted in-tree as unused (replaced by `sharedutils.cronet.CronetManager`) | **DELETE** |
-| `dash/manifest/DashManifest.java` | 34 | `visitorCookie` for subtitle bot-check | **REGRESSION — not yet reimplemented.** The fork added the cookie as an extra `DashManifest` field and `DefaultDashChunkSource` applied it; neither can be patched on a published artifact. `DashManifestParser2` no longer passes it, so the subtitle bot-check cookie is currently not sent. The natural replacement is a request header on the DASH `DataSource.Factory` — a cookie is an HTTP concern, not a manifest field. Fix before shipping |
-| `dash/DefaultDashChunkSource.java` | 10 | Applies that cookie | Same regression as above |
+| `dash/manifest/DashManifest.java` | 34 | `visitorCookie` for subtitle bot-check | **DONE.** Reimplemented app-side as `VisitorCookieResolver`, a `ResolvingDataSource.Resolver` that adds the `Cookie` header — which is where an HTTP concern belongs, rather than on the manifest. Now applies to every DASH request rather than only the subtitle path the fork patched: the cookie identifies the session, not the track |
+| `dash/DefaultDashChunkSource.java` | 10 | Applies that cookie | Superseded by the above |
 | `hls/HlsSampleStreamWrapper.java` | 1 | Pass fps into `Format` | App-side HLS parser subclass |
 | `hls/playlist/HlsPlaylistParser.java` | 4 | Don't append "Default" to format id | App-side parser subclass |
 | `ui/AspectRatioFrameLayout.java` | 44 | `zoomPercents` get/set — **not upstream API**; referenced by name in `lb_playback_fragment.xml:17` | New `common/.../exoplayer/ui/ZoomableAspectRatioFrameLayout`, repoint XML (P6) |

@@ -181,9 +181,22 @@ is the whole of what is known.
 
 ### Other things now missing or moved, beyond SABR
 
-- **Subtitle bot-check visitor cookie** — regression, see PLAYER_DELTAS.md
-- **DRC detection on two of three format paths** — degrades to "not DRC", which is the safe direction
-- **`AmazonQuirks`** — dropped; needs Fire TV validation
+- ~~Subtitle bot-check visitor cookie~~ — **fixed.** `VisitorCookieResolver` attaches it via
+  `ResolvingDataSource`, which is where an HTTP concern belongs. It now applies to every DASH
+  request rather than only the subtitle path the fork patched — the cookie identifies the session,
+  not the track
+- ~~DRC detection on the DASH parser path~~ — **fixed.** `FormatExtras` carries the marker as
+  `Format.metadata`, so the format id (field 3 of the persisted preference string) stays untouched.
+  `TrackSelectorUtil.isDrc` now checks both the id suffix and the marker. **SABR's parser still sets
+  neither** and remains undetected there
+- **`AmazonQuirks`** — partially resolved:
+  - *Profile/level check skipping*: **reimplemented** in `TweaksMediaCodecVideoRenderer` using
+    `MediaCodecUtil.getDecoderInfosSoftMatch`, upstream's equivalent
+  - *Vsync snapping*: **no equivalent exists.** The quirk swapped in a Context-less
+    `VideoFrameReleaseTimeHelper`; its successor `VideoFrameReleaseHelper` is constructed internally
+    by `MediaCodecVideoRenderer` with no hook to replace it. Reproducing it would mean vendoring the
+    renderer — for a 2014-15 Fire TV workaround, against hardware we cannot test, in code upstream
+    has since rewritten. **The setting is currently inert and should either be hidden or removed**
 - **Zoom** moved out of the player: `AspectRatioFrameLayout` is `final` upstream, so the percentage
   now lives in `SurfacePlaybackFragment` and is applied as a scale transform. No player change needed
 - **`ControlDispatcher`** removed: the AFR pause fix became a `ForwardingPlayer` wrapping the player

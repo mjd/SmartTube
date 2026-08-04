@@ -43,11 +43,16 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
             setMediaCodecSelector(new BlacklistMediaCodecSelector());
         }
 
-        // AmazonQuirks was an Amazon-port-only class that does not exist upstream. The two settings
-        // it backed (vsync snapping, profile/level check skipping) targeted 2014-15 Fire TV
-        // hardware; upstream's VideoFrameReleaseHelper and codec capability checks have been
-        // rewritten since. Left unwired pending validation on an actual Fire TV — the user-facing
-        // toggles remain so the behaviour can be restored app-side if a regression appears.
+        // AmazonQuirks was an Amazon-port-only class that does not exist upstream, so its two
+        // settings had to find new homes.
+        //
+        // Profile/level check skipping is reimplemented in TweaksMediaCodecVideoRenderer via
+        // MediaCodecUtil.getDecoderInfosSoftMatch, which is upstream's equivalent.
+        //
+        // Vsync snapping has no equivalent: the quirk swapped in a Context-less
+        // VideoFrameReleaseTimeHelper, and its successor VideoFrameReleaseHelper is constructed
+        // internally by MediaCodecVideoRenderer with no hook to replace it. That setting is
+        // currently inert -- see MIGRATION_STATUS.md.
     }
 
     // 2.12, 2.13
@@ -149,7 +154,8 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
                 enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, out);
         
         if (!mPlayerTweaksData.isAmazonFrameDropFixEnabled() && !mPlayerTweaksData.isSonyFrameDropFixEnabled() && !mPlayerTweaksData.isAmlogicFixEnabled()
-                && !mPlayerTweaksData.isMtkVp9AdaptationFixEnabled()) {
+                && !mPlayerTweaksData.isMtkVp9AdaptationFixEnabled()
+                && !mPlayerTweaksData.isProfileLevelCheckSkipped()) {
             // Improve performance a bit by eliminating some if conditions presented in tweaks.
             // But we need to obtain codec real name somehow. So use interceptor below.
 
@@ -172,6 +178,7 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
         videoRenderer.enableFrameDropSonyFix(mPlayerTweaksData.isSonyFrameDropFixEnabled());
         videoRenderer.enableAmlogicFix(mPlayerTweaksData.isAmlogicFixEnabled());
         videoRenderer.enableMtkVp9AdaptationFix(mPlayerTweaksData.isMtkVp9AdaptationFixEnabled());
+        videoRenderer.skipProfileLevelCheck(mPlayerTweaksData.isProfileLevelCheckSkipped());
         videoRenderer.enableSetOutputSurfaceWorkaround(true); // Force enable?
 
         replaceVideoRenderer(out, videoRenderer);

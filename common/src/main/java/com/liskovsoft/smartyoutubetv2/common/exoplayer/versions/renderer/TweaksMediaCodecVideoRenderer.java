@@ -12,6 +12,8 @@ import com.google.android.exoplayer2.decoder.DecoderReuseEvaluation;
 import com.google.android.exoplayer2.mediacodec.MediaCodecAdapter;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
+import java.util.List;
+import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.sharedutils.mylogger.Log;
 
@@ -21,6 +23,7 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
     private boolean mIsFrameDropSonyFixEnabled;
     private boolean mIsAmlogicFixEnabled;
     private boolean mIsMtkVp9AdaptationFixEnabled;
+    private boolean mIsProfileLevelCheckSkipped;
     private long mLastAdaptationMs = C.TIME_UNSET;
 
     // Exo 2.9
@@ -196,5 +199,31 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
 
     public void enableMtkVp9AdaptationFix(boolean enabled) {
         mIsMtkVp9AdaptationFixEnabled = enabled;
+    }
+
+    public void skipProfileLevelCheck(boolean skip) {
+        mIsProfileLevelCheckSkipped = skip;
+    }
+
+    /**
+     * Replaces the Amazon port's {@code AmazonQuirks.skipProfileLevelCheck}.
+     *
+     * <p>Some devices under-report the profile and level they can actually decode, so a format that
+     * would play fine is rejected outright. The quirk made the capability check pass
+     * unconditionally; upstream has an equivalent in {@code getDecoderInfosSoftMatch}, which returns
+     * decoders matching the mime type without requiring the format's profile and level to be
+     * advertised.
+     */
+    @Override
+    protected List<MediaCodecInfo> getDecoderInfos(
+            MediaCodecSelector mediaCodecSelector, Format format, boolean requiresSecureDecoder)
+            throws MediaCodecUtil.DecoderQueryException {
+        if (mIsProfileLevelCheckSkipped) {
+            Log.d(TAG, "Skipping codec profile/level check for %s", format.codecs);
+            return MediaCodecUtil.getDecoderInfosSoftMatch(
+                    mediaCodecSelector, format, requiresSecureDecoder, /* requiresTunnelingDecoder= */ false);
+        }
+
+        return super.getDecoderInfos(mediaCodecSelector, format, requiresSecureDecoder);
     }
 }

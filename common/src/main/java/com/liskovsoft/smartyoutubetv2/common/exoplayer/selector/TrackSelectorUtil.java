@@ -215,20 +215,20 @@ public class TrackSelectorUtil {
     /**
      * Whether this is a DRC (dynamic range compressed) audio format.
      *
-     * <p>Detection is now purely by format id. The vendored player carried an extra
-     * {@code Format.isDrc} field, which is not something a Maven-consumed player can be given — see
-     * PLAYER_DELTAS.md. Of the three producers, only the MPD builder encodes DRC into the id
-     * ({@code <itag>-drc}); {@code DashManifestParser2} and the SABR parser set the field instead
-     * and leave the id a bare itag.
+     * <p>Two carriers, because the producers disagree. The MPD builder encodes DRC into the id as
+     * {@code <itag>-drc}; {@code DashManifestParser2} attaches a {@link FormatExtras} marker
+     * instead. The vendored player's extra {@code Format.isDrc} field is not something a
+     * Maven-consumed player can be given, and the id cannot simply be rewritten to unify them --
+     * it is field 3 of the persisted preference string, so changing it would invalidate saved
+     * audio selections.
      *
-     * <p>So on those two paths DRC is currently undetected until they are moved app-side and taught
-     * to encode the suffix, which cannot be done by changing the id here: the id is field 3 of the
-     * persisted preference string, and rewriting it would invalidate saved audio selections.
-     * Degrading to "not DRC" is the safe direction — the track still plays, it just is not
+     * <p>SABR's parser sets neither and is still undetected. It is dormant on current hardware, and
+     * degrading to "not DRC" is the safe direction: the track still plays, it is just not
      * preferentially matched.
      */
     public static boolean isDrc(Format format) {
-        return format != null && Helpers.endsWithAny(format.id, "drc");
+        return format != null
+                && (Helpers.endsWithAny(format.id, "drc") || FormatExtras.isDrc(format.metadata));
     }
 
     public static boolean is51Audio(Format format) {
