@@ -14,8 +14,6 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack
 
 public class RestoreTrackSelector extends DefaultTrackSelector {
     private static final String TAG = RestoreTrackSelector.class.getSimpleName();
-    private static final int FORMAT_NOT_SUPPORTED = 19;
-    private static final int FORMAT_FORCE_SUPPORT = 52;
     private TrackSelectorCallback mCallback;
 
     public interface TrackSelectorCallback {
@@ -199,15 +197,5 @@ public class RestoreTrackSelector extends DefaultTrackSelector {
         }
 
         return definitionPair;
-    }
-
-    private void unlockAllVideoFormats(int[][] formatSupports) {
-        final int videoTrackIndex = 0;
-
-        for (int j = 0; j < formatSupports[videoTrackIndex].length; j++) {
-            if (formatSupports[videoTrackIndex][j] == FORMAT_NOT_SUPPORTED) { // video format not supported by system decoders
-                formatSupports[videoTrackIndex][j] = FORMAT_FORCE_SUPPORT; // force support of video format
-            }
-        }
     }
 }
