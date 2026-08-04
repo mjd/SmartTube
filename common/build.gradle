@@ -12,6 +12,9 @@ android {
     compileSdkVersion project.properties.compileSdkVersion
     buildToolsVersion project.properties.buildToolsVersion
     testOptions.unitTests.includeAndroidResources = true
+    // Allow plain-JUnit tests (no Robolectric, which can't run under the JDK 17 this build needs)
+    // to exercise code that touches android.* stubs.
+    testOptions.unitTests.returnDefaultValues = true
 
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion
