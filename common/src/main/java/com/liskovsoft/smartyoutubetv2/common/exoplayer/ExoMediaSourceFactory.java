@@ -42,6 +42,7 @@ import com.liskovsoft.sharedutils.cronet.CronetManager;
 import com.liskovsoft.sharedutils.helpers.FileHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.debug.SabrCapture;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DashDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
@@ -363,7 +364,9 @@ public class ExoMediaSourceFactory {
 
     @NonNull
     private SabrChunkSource.Factory getSabrChunkSourceFactory() {
-        return new DefaultSabrChunkSource.Factory(getMediaDataSourceFactory(), MAX_SEGMENTS_PER_LOAD);
+        // SabrCapture.wrap() is a no-op unless golden-file capture is switched on at compile time.
+        return new DefaultSabrChunkSource.Factory(
+                SabrCapture.wrap(mContext, getMediaDataSourceFactory()), MAX_SEGMENTS_PER_LOAD);
     }
 
     @NonNull
