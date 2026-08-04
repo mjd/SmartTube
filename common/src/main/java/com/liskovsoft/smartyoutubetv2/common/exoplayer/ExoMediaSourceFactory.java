@@ -18,7 +18,7 @@ import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
-import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser2;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.dash.DashManifestParser2;
 import com.google.android.exoplayer2.source.dash.manifest.Period;
 import com.google.android.exoplayer2.source.dash.manifest.ProgramInformation;
 import com.google.android.exoplayer2.source.dash.manifest.ServiceDescriptionElement;

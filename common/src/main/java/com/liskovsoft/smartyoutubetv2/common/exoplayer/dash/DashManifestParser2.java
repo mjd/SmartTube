@@ -1,4 +1,9 @@
-package com.google.android.exoplayer2.source.dash.manifest;
+package com.liskovsoft.smartyoutubetv2.common.exoplayer.dash;
+
+// Moved out of com.google.android.exoplayer2.source.dash.manifest. It lived there to reach
+// package-private members of the DASH manifest model; everything it needs is public
+// (Representation via newInstance), so it can live app-side now that the player is a
+// dependency rather than vendored sources.
 
 import android.text.TextUtils;
 import android.util.Pair;
@@ -9,6 +14,16 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
+import com.google.common.collect.ImmutableList;
+import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
+import com.google.android.exoplayer2.source.dash.manifest.BaseUrl;
+import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
+import com.google.android.exoplayer2.source.dash.manifest.Descriptor;
+import com.google.android.exoplayer2.source.dash.manifest.Period;
+import com.google.android.exoplayer2.source.dash.manifest.RangedUri;
+import com.google.android.exoplayer2.source.dash.manifest.Representation;
+import com.google.android.exoplayer2.source.dash.manifest.SegmentBase;
+import com.google.android.exoplayer2.source.dash.manifest.UrlTemplate;
 import com.google.android.exoplayer2.source.dash.manifest.SegmentBase.SegmentList;
 import com.google.android.exoplayer2.source.dash.manifest.SegmentBase.SegmentTemplate;
 import com.google.android.exoplayer2.source.dash.manifest.SegmentBase.SegmentTimelineElement;
@@ -82,10 +97,10 @@ public class DashManifestParser2 {
                 timeShiftBufferDepthMs,
                 suggestedPresentationDelayMs,
                 publishTimeMs,
-                null,
-                null,
-                null,
-                formatInfo.getVisitorCookie(),
+                /* programInformation= */ null,
+                /* utcTiming= */ null,
+                /* serviceDescription= */ null,
+                /* location= */ null,
                 periods);
     }
 
@@ -158,7 +173,8 @@ public class DashManifestParser2 {
                             drmSchemeDatas));
         }
 
-        return new AdaptationSet(id, contentType, representations, new ArrayList<>(), new ArrayList<>());
+        // AdaptationSet gained a third descriptor list (accessibility, essential, supplemental).
+        return new AdaptationSet(id, contentType, representations, new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
     }
 
     private AdaptationSet parseAdaptationSet(List<MediaSubtitle> formats) {
@@ -188,7 +204,8 @@ public class DashManifestParser2 {
                             drmSchemeDatas));
         }
 
-        return new AdaptationSet(id, contentType, representations, new ArrayList<>(), new ArrayList<>());
+        // AdaptationSet gained a third descriptor list (accessibility, essential, supplemental).
+        return new AdaptationSet(id, contentType, representations, new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
     }
 
     private SegmentTemplate parseSegmentTemplate(MediaFormat format) {
@@ -234,6 +251,8 @@ public class DashManifestParser2 {
 
         List<SegmentTimelineElement> timeline = parseSegmentTimeline(offsetUnits, segmentDurationUnits, segmentCount);
 
+        // SegmentTemplate likewise gained availabilityTimeOffsetUs, timeShiftBufferDepthUs and
+        // periodStartUnixTimeUs.
         return new SegmentTemplate(
                 initialization,
                 timescale,
@@ -242,8 +261,11 @@ public class DashManifestParser2 {
                 endNumber,
                 duration,
                 timeline,
+                C.TIME_UNSET,
                 initializationTemplate,
-                mediaTemplate);
+                mediaTemplate,
+                C.TIME_UNSET,
+                C.TIME_UNSET);
     }
 
     private SegmentList parseSegmentList(MediaFormat format) {
@@ -258,8 +280,11 @@ public class DashManifestParser2 {
 
         List<RangedUri> segments = parseSegmentUrl(format);
 
+        // SegmentList gained availabilityTimeOffsetUs, timeShiftBufferDepthUs and
+        // periodStartUnixTimeUs; unset for the static manifests this parser produces.
         return new SegmentList(initialization, timescale, presentationTimeOffset,
-                startNumber, duration, timeline, segments);
+                startNumber, duration, timeline, C.TIME_UNSET, segments,
+                C.TIME_UNSET, C.TIME_UNSET);
     }
 
     private RangedUri parseRangedUrl(String urlText, String rangeText) {
@@ -455,7 +480,7 @@ public class DashManifestParser2 {
             ArrayList<SchemeData> extraDrmSchemeDatas) {
         Format format = representationInfo.format;
         if (label != null) {
-            format = format.copyWithLabel(label);
+            format = format.buildUpon().setLabel(label).build(); // copyWithLabel was removed
         }
         String drmSchemeType = representationInfo.drmSchemeType != null
                 ? representationInfo.drmSchemeType : extraDrmSchemeType;
@@ -464,14 +489,14 @@ public class DashManifestParser2 {
         if (!drmSchemeDatas.isEmpty()) {
             filterRedundantIncompleteSchemeDatas(drmSchemeDatas);
             DrmInitData drmInitData = new DrmInitData(drmSchemeType, drmSchemeDatas);
-            format = format.copyWithDrmInitData(drmInitData);
+            format = format.buildUpon().setDrmInitData(drmInitData).build(); // copyWithDrmInitData was removed
         }
+        // A Representation now takes a list of BaseUrls rather than a single String.
         return Representation.newInstance(
                 representationInfo.revisionId,
                 format,
-                representationInfo.baseUrl,
-                representationInfo.segmentBase,
-                new ArrayList<>());
+                ImmutableList.of(new BaseUrl(representationInfo.baseUrl)),
+                representationInfo.segmentBase);
     }
 
     protected Format buildFormat(
@@ -491,64 +516,35 @@ public class DashManifestParser2 {
             boolean isDrc,
             long lastModified) {
         String sampleMimeType = getSampleMimeType(containerMimeType, codecs);
+
+        // The createXContainerFormat factories were removed upstream in favour of Format.Builder,
+        // which also collapses the video/audio/text/plain variants into a single chain -- unset
+        // fields simply keep their defaults.
+        //
+        // NOTE: isDrc and lastModified are dropped. They were extra fields on the vendored player's
+        // Format and cannot exist on a published artifact (see PLAYER_DELTAS.md). lastModified was
+        // only ever read by SABR; DRC is now derived from the format id suffix.
+        Format.Builder builder = new Format.Builder()
+                .setId(id)
+                .setLabel(label)
+                .setContainerMimeType(containerMimeType)
+                .setSampleMimeType(sampleMimeType)
+                .setCodecs(codecs)
+                .setAverageBitrate(bitrate)
+                .setPeakBitrate(bitrate)
+                .setSelectionFlags(selectionFlags)
+                .setRoleFlags(roleFlags)
+                .setLanguage(language);
+
         if (sampleMimeType != null) {
             if (MimeTypes.isVideo(sampleMimeType)) {
-                return Format.createVideoContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        /* metadata= */ null,
-                        bitrate,
-                        width,
-                        height,
-                        frameRate,
-                        /* initializationData= */ null,
-                        selectionFlags,
-                        roleFlags,
-                        lastModified);
+                builder.setWidth(width).setHeight(height).setFrameRate(frameRate);
             } else if (MimeTypes.isAudio(sampleMimeType)) {
-                return Format.createAudioContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        /* metadata= */ null,
-                        bitrate,
-                        audioChannels,
-                        audioSamplingRate,
-                        /* initializationData= */ null,
-                        selectionFlags,
-                        roleFlags,
-                        language,
-                        isDrc,
-                        lastModified);
-            } else if (mimeTypeIsRawText(sampleMimeType)) {
-                return Format.createTextContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        bitrate,
-                        selectionFlags,
-                        roleFlags,
-                        language,
-                        Format.NO_VALUE);
+                builder.setChannelCount(audioChannels).setSampleRate(audioSamplingRate);
             }
         }
-        return Format.createContainerFormat(
-                id,
-                label,
-                containerMimeType,
-                sampleMimeType,
-                codecs,
-                bitrate,
-                selectionFlags,
-                roleFlags,
-                language);
+
+        return builder.build();
     }
 
     /**
