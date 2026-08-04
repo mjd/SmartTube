@@ -55,7 +55,7 @@ import java.util.Locale;
  * A helper class for periodically updating a {@link TextView} with debug information obtained from
  * a {@link SimpleExoPlayer}.
  */
-public final class DebugInfoManager implements Runnable, Player.EventListener {
+public final class DebugInfoManager implements Runnable, Player.Listener {
     private static final String TAG = DebugInfoManager.class.getSimpleName();
     private static final int REFRESH_INTERVAL_MS = 1000;
     private static final String NOT_AVAILABLE = "none";
@@ -142,47 +142,11 @@ public final class DebugInfoManager implements Runnable, Player.EventListener {
         mUhdHelper = null;
     }
 
-    // Player.EventListener implementation.
-
-    @Override
-    public void onLoadingChanged(boolean isLoading) {
-        // NOP
-    }
-
-    @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-        // NOP
-    }
-
-    @Override
-    public void onRepeatModeChanged(int repeatMode) {
-        // NOP
-    }
-
-    @Override
-    public void onPositionDiscontinuity(int reason) {
-        // NOP
-    }
-
-    @Override
-    public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
-        // NOP
-    }
-
-    @Override
-    public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
-        // Do nothing.
-    }
-
-    @Override
-    public void onPlayerError(ExoPlaybackException error) {
-        // Do nothing.
-    }
-
-    @Override
-    public void onTracksChanged(TrackGroupArray tracks, TrackSelectionArray selections) {
-        // NOP
-    }
+    // Player.Listener implementation.
+    //
+    // Every callback this class used to declare was a NOP, kept only because the old
+    // Player.EventListener made them abstract. Player.Listener supplies default implementations for
+    // all of them, so they are gone; this class registers purely to keep its debug overlay ticking.
 
     // Runnable implementation.
 

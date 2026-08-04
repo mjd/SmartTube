@@ -212,8 +212,23 @@ public class TrackSelectorUtil {
         return isDrc(format) ? "DRC" : "";
     }
 
+    /**
+     * Whether this is a DRC (dynamic range compressed) audio format.
+     *
+     * <p>Detection is now purely by format id. The vendored player carried an extra
+     * {@code Format.isDrc} field, which is not something a Maven-consumed player can be given — see
+     * PLAYER_DELTAS.md. Of the three producers, only the MPD builder encodes DRC into the id
+     * ({@code <itag>-drc}); {@code DashManifestParser2} and the SABR parser set the field instead
+     * and leave the id a bare itag.
+     *
+     * <p>So on those two paths DRC is currently undetected until they are moved app-side and taught
+     * to encode the suffix, which cannot be done by changing the id here: the id is field 3 of the
+     * persisted preference string, and rewriting it would invalidate saved audio selections.
+     * Degrading to "not DRC" is the safe direction — the track still plays, it just is not
+     * preferentially matched.
+     */
     public static boolean isDrc(Format format) {
-        return format != null && (Helpers.endsWithAny(format.id, "drc") || format.isDrc);
+        return format != null && Helpers.endsWithAny(format.id, "drc");
     }
 
     public static boolean is51Audio(Format format) {

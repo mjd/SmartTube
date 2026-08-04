@@ -7,17 +7,9 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.audio.AudioAttributes;
-import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.ExoMediaDrm.KeyRequest;
-import com.google.android.exoplayer2.drm.ExoMediaDrm.ProvisionRequest;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
-import com.google.android.exoplayer2.drm.MediaDrmCallback;
-import com.google.android.exoplayer2.drm.UnsupportedDrmException;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.TransferListener;
@@ -54,14 +46,11 @@ public class ExoPlayerInitializer {
         // HDR fix?
         //trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingAudioSessionId(C.generateAudioSessionIdV21(context)));
 
-        // Old initializer
-        SimpleExoPlayer player = ExoPlayerFactory.newSimpleInstance(context, renderersFactory, trackSelector, loadControl);
-
-        // New initializer
-        //SimpleExoPlayer player = ExoPlayerFactory.newSimpleInstance(
-        //        context, renderersFactory, trackSelector, loadControl,
-        //        null, new DummyBandwidthMeter(), new AnalyticsCollector.Factory(), Util.getLooper()
-        //);
+        // ExoPlayerFactory was removed upstream in favour of the builder.
+        SimpleExoPlayer player = new SimpleExoPlayer.Builder(context, renderersFactory)
+                .setTrackSelector(trackSelector)
+                .setLoadControl(loadControl)
+                .build();
 
         //enableAudioFocus(player);
 
@@ -145,7 +134,7 @@ public class ExoPlayerInitializer {
         // Decrease buffer size?
         //baseBuilder.setAllocator(new DefaultAllocator(true, 16 * 1024));
 
-        return baseBuilder.createDefaultLoadControl();
+        return baseBuilder.build(); // was createDefaultLoadControl(), renamed upstream
     }
 
     private void setupVolumeBoost(SimpleExoPlayer player) {
@@ -203,25 +192,9 @@ public class ExoPlayerInitializer {
         mPlayer = null;
     }
 
-    private DrmSessionManager<FrameworkMediaCrypto> createDrmManager() {
-        try {
-            return DefaultDrmSessionManager.newWidevineInstance(new MediaDrmCallback() {
-                @Override
-                public byte[] executeProvisionRequest(UUID uuid, ProvisionRequest request) {
-                    return new byte[0];
-                }
-
-                @Override
-                public byte[] executeKeyRequest(UUID uuid, KeyRequest request) {
-                    return new byte[0];
-                }
-            }, null);
-        } catch (UnsupportedDrmException e) {
-            e.printStackTrace();
-        }
-
-        return null;
-    }
+    // createDrmManager() removed: it was private with no callers, and returned a Widevine manager
+    // whose callback answered every provision and key request with an empty byte array. SmartTube
+    // plays no DRM-protected content. See PLAYER_DELTAS.md.
 
     private static final class DummyBandwidthMeter implements BandwidthMeter {
         @Override

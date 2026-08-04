@@ -8,7 +8,9 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
+import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MergingMediaSource;
@@ -219,7 +221,9 @@ public class ExoPlayerController implements Player.Listener {
         if (mContext != null && trackSelector != null && PlayerTweaksData.instance(mContext).isTunneledPlaybackEnabled()) {
             // Enable tunneling if supported by the current media and device configuration.
             if (VERSION.SDK_INT >= 21) {
-                trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingAudioSessionId(C.generateAudioSessionIdV21(mContext)));
+                // setTunnelingAudioSessionId(int) became setTunnelingEnabled(boolean); the player now
+                // allocates the audio session itself.
+                trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingEnabled(true));
             }
         }
     }
@@ -271,7 +275,9 @@ public class ExoPlayerController implements Player.Listener {
     }
 
     @Override
-    public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+    public void onTracksChanged(Tracks tracks) {
+        // The callback no longer carries the raw groups/selections; read them back off the player.
+        TrackGroupArray trackGroups = mPlayer != null ? mPlayer.getCurrentTrackGroups() : TrackGroupArray.EMPTY;
         Log.d(TAG, "onTracksChanged: start: groups length: " + trackGroups.length);
 
         if (trackGroups.length == 0) {
@@ -281,12 +287,11 @@ public class ExoPlayerController implements Player.Listener {
 
         notifyOnVideoLoad();
 
+        TrackSelectionArray trackSelections = mPlayer != null
+                ? mPlayer.getCurrentTrackSelections() : new TrackSelectionArray();
+
         for (TrackSelection selection : trackSelections.getAll()) {
             if (selection != null) {
-                // EXO: 2.12.1
-                //Format format = selection.getSelectedFormat();
-
-                // EXO: 2.13.1
                 Format format = selection.getFormat(0);
 
                 mEventListener.onTrackChanged(ExoFormatItem.from(format));
@@ -319,14 +324,23 @@ public class ExoPlayerController implements Player.Listener {
     }
 
     @Override
-    public void onPlayerError(ExoPlaybackException error) {
+    public void onPlayerError(PlaybackException error) {
         Log.e(TAG, "onPlayerError: " + error);
 
         // NOTE: Player is released at this point. So, there is no sense to restore the playback here.
 
         Throwable nested = error.getCause() != null ? error.getCause() : error;
 
-        mEventListener.onEngineError(error.type, error.rendererIndex, nested);
+        // type/rendererIndex live on ExoPlaybackException; the callback is now typed to its
+        // PlaybackException supertype, which carries only an errorCode.
+        int type = error instanceof ExoPlaybackException
+                ? ((ExoPlaybackException) error).type : ExoPlaybackException.TYPE_UNEXPECTED;
+        int rendererIndex = error instanceof ExoPlaybackException
+                && ((ExoPlaybackException) error).type == ExoPlaybackException.TYPE_RENDERER
+                ? ((ExoPlaybackException) error).rendererIndex
+                : TrackSelectorManager.RENDERER_INDEX_UNKNOWN;
+
+        mEventListener.onEngineError(type, rendererIndex, nested);
     }
 
     @Override
@@ -362,20 +376,21 @@ public class ExoPlayerController implements Player.Listener {
     }
 
     @Override
-    public void onPositionDiscontinuity(int reason) {
+    public void onPositionDiscontinuity(Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
         Log.e(TAG, "onPositionDiscontinuity");
 
         // Fix video loop on 480p with legacy codes enabled
-        if (reason == Player.DISCONTINUITY_REASON_PERIOD_TRANSITION) {
+        if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
             mPlayer.stop();
             mEventListener.onPlayEnd();
+        } else if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+            // Replaces the removed onSeekProcessed() callback.
+            mEventListener.onSeekEnd();
         }
     }
 
-    @Override
-    public void onSeekProcessed() {
-        mEventListener.onSeekEnd();
-    }
+    // onSeekProcessed() was removed from the listener interface. Seek completion is now signalled
+    // through onPositionDiscontinuity with DISCONTINUITY_REASON_SEEK, handled above.
 
     public float getSpeed() {
         if (mPlayer != null) {
@@ -436,7 +451,9 @@ public class ExoPlayerController implements Player.Listener {
      */
     public void resetPlayerState() {
         if (containsMedia()) {
-            mPlayer.stop(true);
+            // stop(true) was split into stop() + clearMediaItems() upstream.
+            mPlayer.stop();
+            mPlayer.clearMediaItems();
         }
     }
     
@@ -489,7 +506,7 @@ public class ExoPlayerController implements Player.Listener {
 
         try {
             mPlayer.removeListener(this);
-            mPlayer.stop(true); // Cause input lags due to high cpu load?
+            mPlayer.stop(); // stop(true) split upstream; media items cleared by release() below
             mPlayer.clearVideoSurface();
             mPlayer.release();
         } catch (ArrayIndexOutOfBoundsException e) { // thrown on stop()
