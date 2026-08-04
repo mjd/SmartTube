@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.source.sabr.manifest.SegmentBase.SegmentList;
@@ -458,7 +459,7 @@ public class SabrManifestParser {
             ArrayList<SchemeData> extraDrmSchemeDatas) {
         Format format = representationInfo.format;
         if (label != null) {
-            format = format.copyWithLabel(label);
+            format = format.buildUpon().setLabel(label).build(); // copyWithLabel was removed
         }
         String drmSchemeType = representationInfo.drmSchemeType != null
                 ? representationInfo.drmSchemeType : extraDrmSchemeType;
@@ -467,7 +468,7 @@ public class SabrManifestParser {
         if (!drmSchemeDatas.isEmpty()) {
             filterRedundantIncompleteSchemeDatas(drmSchemeDatas);
             DrmInitData drmInitData = new DrmInitData(drmSchemeType, drmSchemeDatas);
-            format = format.copyWithDrmInitData(drmInitData);
+            format = format.buildUpon().setDrmInitData(drmInitData).build(); // copyWithDrmInitData was removed
         }
         return Representation.newInstance(
                 representationInfo.revisionId,
@@ -493,64 +494,35 @@ public class SabrManifestParser {
             boolean isDrc,
             long lastModified) {
         String sampleMimeType = getSampleMimeType(containerMimeType, codecs);
+
+        // The createXContainerFormat factories were removed upstream in favour of Format.Builder,
+        // which collapses the video/audio/text/plain variants into one chain.
+        //
+        // lastModified travels as Metadata rather than the extra Format field the vendored player
+        // had: SABR echoes it back in the FormatId of every request, and FormatSelector reads it
+        // off a Format that has already passed through track selection.
+        Format.Builder builder = new Format.Builder()
+                .setId(id)
+                .setLabel(label)
+                .setContainerMimeType(containerMimeType)
+                .setSampleMimeType(sampleMimeType)
+                .setCodecs(codecs)
+                .setAverageBitrate(bitrate)
+                .setPeakBitrate(bitrate)
+                .setSelectionFlags(selectionFlags)
+                .setRoleFlags(roleFlags)
+                .setLanguage(language)
+                .setMetadata(new Metadata(new SabrFormatExtras(lastModified)));
+
         if (sampleMimeType != null) {
             if (MimeTypes.isVideo(sampleMimeType)) {
-                return Format.createVideoContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        /* metadata= */ null,
-                        bitrate,
-                        width,
-                        height,
-                        frameRate,
-                        /* initializationData= */ null,
-                        selectionFlags,
-                        roleFlags,
-                        lastModified);
+                builder.setWidth(width).setHeight(height).setFrameRate(frameRate);
             } else if (MimeTypes.isAudio(sampleMimeType)) {
-                return Format.createAudioContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        /* metadata= */ null,
-                        bitrate,
-                        audioChannels,
-                        audioSamplingRate,
-                        /* initializationData= */ null,
-                        selectionFlags,
-                        roleFlags,
-                        language,
-                        isDrc,
-                        lastModified);
-            } else if (mimeTypeIsRawText(sampleMimeType)) {
-                return Format.createTextContainerFormat(
-                        id,
-                        label,
-                        containerMimeType,
-                        sampleMimeType,
-                        codecs,
-                        bitrate,
-                        selectionFlags,
-                        roleFlags,
-                        language,
-                        Format.NO_VALUE);
+                builder.setChannelCount(audioChannels).setSampleRate(audioSamplingRate);
             }
         }
-        return Format.createContainerFormat(
-                id,
-                label,
-                containerMimeType,
-                sampleMimeType,
-                codecs,
-                bitrate,
-                selectionFlags,
-                roleFlags,
-                language);
+
+        return builder.build();
     }
 
     /**

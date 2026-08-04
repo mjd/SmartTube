@@ -27,7 +27,7 @@ import com.google.android.exoplayer2.source.sabr.manifest.EventStream;
 import com.google.android.exoplayer2.source.sabr.manifest.Period;
 import com.google.android.exoplayer2.source.sabr.manifest.Representation;
 import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
-import com.google.android.exoplayer2.trackselection.TrackSelection;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
@@ -128,7 +128,7 @@ final class SabrMediaPeriod
 
     @Override
     public long selectTracks(
-            @Nullable TrackSelection[] selections,
+            @Nullable ExoTrackSelection[] selections,
             boolean[] mayRetainStreamFlags,
             @Nullable SampleStream[] streams,
             boolean[] streamResetFlags,
@@ -406,7 +406,7 @@ final class SabrMediaPeriod
         return new Format[0];
     }
 
-    private int[] getStreamIndexToTrackGroupIndex(TrackSelection[] selections) {
+    private int[] getStreamIndexToTrackGroupIndex(ExoTrackSelection[] selections) {
         int[] streamIndexToTrackGroupIndex = new int[selections.length];
         for (int i = 0; i < selections.length; i++) {
             if (selections[i] != null) {
@@ -419,7 +419,7 @@ final class SabrMediaPeriod
     }
 
     private void releaseDisabledStreams(
-            TrackSelection[] selections, boolean[] mayRetainStreamFlags, SampleStream[] streams) {
+            ExoTrackSelection[] selections, boolean[] mayRetainStreamFlags, SampleStream[] streams) {
         for (int i = 0; i < selections.length; i++) {
             if (selections[i] == null || !mayRetainStreamFlags[i]) {
                 if (streams[i] instanceof ChunkSampleStream) {
@@ -436,7 +436,7 @@ final class SabrMediaPeriod
     }
 
     private void releaseOrphanEmbeddedStreams(
-            TrackSelection[] selections, SampleStream[] streams, int[] streamIndexToTrackGroupIndex) {
+            ExoTrackSelection[] selections, SampleStream[] streams, int[] streamIndexToTrackGroupIndex) {
         for (int i = 0; i < selections.length; i++) {
             if (streams[i] instanceof EmptySampleStream || streams[i] instanceof EmbeddedSampleStream) {
                 // We need to release an embedded stream if the corresponding primary stream is released.
@@ -481,14 +481,14 @@ final class SabrMediaPeriod
     }
 
     private void selectNewStreams(
-            TrackSelection[] selections,
+            ExoTrackSelection[] selections,
             SampleStream[] streams,
             boolean[] streamResetFlags,
             long positionUs,
             int[] streamIndexToTrackGroupIndex) {
         // Create newly selected primary and event streams.
         for (int i = 0; i < selections.length; i++) {
-            TrackSelection selection = selections[i];
+            ExoTrackSelection selection = selections[i];
             if (selection == null) {
                 continue;
             }
@@ -535,7 +535,7 @@ final class SabrMediaPeriod
     }
 
     private ChunkSampleStream<SabrChunkSource> buildSampleStream(TrackGroupInfo trackGroupInfo,
-                                                                 TrackSelection selection, long positionUs) {
+                                                                 ExoTrackSelection selection, long positionUs) {
         int embeddedTrackCount = 0;
         boolean enableEventMessageTrack =
                 trackGroupInfo.embeddedEventMessageTrackGroupIndex != C.INDEX_UNSET;

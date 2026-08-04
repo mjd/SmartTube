@@ -23,7 +23,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.chunk.ChunkSource;
 import com.google.android.exoplayer2.source.sabr.PlayerEmsgHandler.PlayerTrackEmsgHandler;
 import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
-import com.google.android.exoplayer2.trackselection.TrackSelection;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.TransferListener;
 
@@ -57,7 +57,7 @@ public interface SabrChunkSource extends ChunkSource {
         SabrManifest manifest,
         int periodIndex,
         int[] adaptationSetIndices,
-        TrackSelection trackSelection,
+        ExoTrackSelection trackSelection,
         int type,
         long elapsedRealtimeOffsetMs,
         boolean enableEventMessageTrack,
@@ -78,5 +78,5 @@ public interface SabrChunkSource extends ChunkSource {
    *
    * @param trackSelection The new track selection instance. Must be equivalent to the previous one.
    */
-  void updateTrackSelection(TrackSelection trackSelection);
+  void updateTrackSelection(ExoTrackSelection trackSelection);
 }

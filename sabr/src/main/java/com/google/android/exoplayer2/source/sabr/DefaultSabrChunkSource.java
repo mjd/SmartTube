@@ -33,7 +33,7 @@ import com.google.android.exoplayer2.source.sabr.parser.models.CaptionSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.FormatSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.VideoSelector;
 import com.google.android.exoplayer2.source.sabr.protos.misc.FormatId;
-import com.google.android.exoplayer2.trackselection.TrackSelection;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
@@ -68,7 +68,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 SabrManifest manifest,
                 int periodIndex,
                 int[] adaptationSetIndices,
-                TrackSelection trackSelection,
+                ExoTrackSelection trackSelection,
                 int trackType,
                 long elapsedRealtimeOffsetMs,
                 boolean enableEventMessageTrack,
@@ -107,7 +107,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     protected final RepresentationHolder[] representationHolders;
 
-    private TrackSelection trackSelection;
+    private ExoTrackSelection trackSelection;
     private FormatSelector formatSelector;
     private SabrManifest manifest;
     private int periodIndex;
@@ -143,7 +143,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             SabrManifest manifest,
             int periodIndex,
             int[] adaptationSetIndices,
-            TrackSelection trackSelection,
+            ExoTrackSelection trackSelection,
             int trackType,
             DataSource dataSource,
             long elapsedRealtimeOffsetMs,
@@ -211,7 +211,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     @Override
-    public void updateTrackSelection(TrackSelection trackSelection) {
+    public void updateTrackSelection(ExoTrackSelection trackSelection) {
         this.trackSelection = trackSelection;
         this.formatSelector = createFormatSelector(trackType, trackSelection);
     }
@@ -661,7 +661,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //}
     }
 
-    private static AudioSelector createAudioSelection(int trackType, TrackSelection trackSelection) {
+    private static AudioSelector createAudioSelection(int trackType, ExoTrackSelection trackSelection) {
         if (trackType != C.TRACK_TYPE_AUDIO) {
             return null;
         }
@@ -671,7 +671,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         return new AudioSelector("selected_audio", false, selectedFormat);
     }
 
-    private static VideoSelector createVideoSelection(int trackType, TrackSelection trackSelection) {
+    private static VideoSelector createVideoSelection(int trackType, ExoTrackSelection trackSelection) {
         if (trackType != C.TRACK_TYPE_VIDEO) {
             return null;
         }
@@ -681,7 +681,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         return new VideoSelector("selected_video", false, selectedFormat);
     }
 
-    private static CaptionSelector createCaptionSelection(int trackType, TrackSelection trackSelection) {
+    private static CaptionSelector createCaptionSelection(int trackType, ExoTrackSelection trackSelection) {
         if (trackType != C.TRACK_TYPE_TEXT) {
             return null;
         }
@@ -691,7 +691,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         return new CaptionSelector("selected_caption", false, selectedFormat);
     }
 
-    private static FormatSelector createFormatSelector(int trackType, TrackSelection trackSelection) {
+    private static FormatSelector createFormatSelector(int trackType, ExoTrackSelection trackSelection) {
         Format selectedFormat = trackSelection.getSelectedFormat();
 
         switch (trackType) {
