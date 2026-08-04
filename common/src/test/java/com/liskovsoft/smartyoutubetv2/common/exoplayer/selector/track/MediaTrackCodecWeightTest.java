@@ -125,10 +125,13 @@ public class MediaTrackCodecWeightTest {
 
     private static MediaTrack trackWithCodec(String codecs) {
         VideoTrack track = new VideoTrack(0);
-        track.format = com.google.android.exoplayer2.Format.createVideoSampleFormat(
-                /* id= */ "1", /* sampleMimeType= */ null, /* codecs= */ codecs,
-                /* bitrate= */ -1, /* maxInputSize= */ -1, /* width= */ 1920, /* height= */ 1080,
-                /* frameRate= */ 30f, /* initializationData= */ null, /* drmInitData= */ null);
+        track.format = new com.google.android.exoplayer2.Format.Builder()
+                .setId("1")
+                .setCodecs(codecs)
+                .setWidth(1920)
+                .setHeight(1080)
+                .setFrameRate(30f)
+                .build();
         return track;
     }
 }

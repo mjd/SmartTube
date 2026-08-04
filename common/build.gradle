@@ -21,7 +21,7 @@ android {
     testOptions.unitTests.returnDefaultValues = true
 
     defaultConfig {
-        minSdkVersion project.properties.minSdkVersion
+        minSdkVersion rootProject.ext.migrationMinSdk
         targetSdkVersion project.properties.targetSdkVersion
         versionCode 10
         versionName "1.0"
@@ -76,7 +76,7 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
-    implementation project(':sabr')
+    // :sabr is excluded until its port completes; see MIGRATION_STATUS.md
     implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-dash:' + rootProject.ext.exoplayerMigrationVersion
     implementation 'com.google.android.exoplayer:exoplayer-hls:' + rootProject.ext.exoplayerMigrationVersion

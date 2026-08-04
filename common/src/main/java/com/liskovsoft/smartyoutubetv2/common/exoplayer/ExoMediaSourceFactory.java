@@ -24,11 +24,6 @@ import com.google.android.exoplayer2.source.dash.manifest.ProgramInformation;
 import com.google.android.exoplayer2.source.dash.manifest.ServiceDescriptionElement;
 import com.google.android.exoplayer2.source.dash.manifest.UtcTimingElement;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
-import com.google.android.exoplayer2.source.sabr.DefaultSabrChunkSource;
-import com.google.android.exoplayer2.source.sabr.SabrChunkSource;
-import com.google.android.exoplayer2.source.sabr.SabrMediaSource;
-import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
-import com.google.android.exoplayer2.source.sabr.manifest.SabrManifestParser;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -43,9 +38,7 @@ import com.liskovsoft.sharedutils.cronet.CronetManager;
 import com.liskovsoft.sharedutils.helpers.FileHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
-import com.liskovsoft.smartyoutubetv2.common.exoplayer.debug.SabrCapture;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DashDefaultLoadErrorHandlingPolicy;
-import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -184,18 +177,16 @@ public class ExoMediaSourceFactory {
         }
     }
 
+    /**
+     * SABR playback is unavailable while its module finishes being ported to the new player
+     * (see MIGRATION_STATUS.md).
+     *
+     * <p>Returns null rather than throwing: {@code VideoLoaderController} already skips the SABR
+     * branch via its own flag, so this is a second line of defence rather than the primary guard.
+     */
     private MediaSource buildSabrMediaSource(MediaItemFormatInfo formatInfo) {
-        // Are you using FrameworkSampleSource or ExtractorSampleSource when you build your player?
-        SabrMediaSource sabrSource = new SabrMediaSource.Factory(
-                getSabrChunkSourceFactory(),
-                null
-        )
-                .setLoadErrorHandlingPolicy(new SabrDefaultLoadErrorHandlingPolicy())
-                .createMediaSource(getSabrManifest(formatInfo));
-        if (mTrackErrorFixer != null) {
-            sabrSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
-        }
-        return sabrSource;
+        Log.e(TAG, "SABR playback is not available in this build.");
+        return null;
     }
 
     private MediaSource buildDashMediaSource(MediaItemFormatInfo formatInfo) {
@@ -244,10 +235,7 @@ public class ExoMediaSourceFactory {
         return dashSource;
     }
 
-    private SabrManifest getSabrManifest(MediaItemFormatInfo formatInfo) {
-        SabrManifestParser parser = new SabrManifestParser();
-        return parser.parse(formatInfo);
-    }
+    // getSabrManifest() removed alongside the SABR source; it only existed to feed it.
 
     private DashManifest getManifest(MediaItemFormatInfo formatInfo) {
         DashManifestParser2 parser = new DashManifestParser2();
@@ -380,12 +368,9 @@ public class ExoMediaSourceFactory {
         return new DefaultSsChunkSource.Factory(getMediaDataSourceFactory());
     }
 
-    @NonNull
-    private SabrChunkSource.Factory getSabrChunkSourceFactory() {
-        // SabrCapture.wrap() is a no-op unless golden-file capture is switched on at compile time.
-        return new DefaultSabrChunkSource.Factory(
-                SabrCapture.wrap(mContext, getMediaDataSourceFactory()), MAX_SEGMENTS_PER_LOAD);
-    }
+    // getSabrChunkSourceFactory() removed with the SABR source. The SabrCapture tap it carried goes
+    // with it for now; re-apply it when SABR is wired back up, since capture is still the only route
+    // to a golden-file baseline for the port.
 
     @NonNull
     private DashChunkSource.Factory getDashChunkSourceFactory() {

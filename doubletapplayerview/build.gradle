@@ -7,7 +7,7 @@ android {
     buildToolsVersion project.properties.buildToolsVersion
 
     defaultConfig {
-        minSdkVersion project.properties.minSdkVersion
+        minSdkVersion rootProject.ext.migrationMinSdk
         targetSdkVersion project.properties.targetSdkVersion
         versionCode 40001
         versionName '1.0.4'

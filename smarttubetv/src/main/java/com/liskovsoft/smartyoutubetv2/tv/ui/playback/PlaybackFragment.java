@@ -35,8 +35,7 @@ import com.github.vkay94.dtpv.DoubleTapPlayerAdapter;
 import com.github.vkay94.dtpv.DoubleTapPlayerView;
 import com.github.vkay94.dtpv.youtube.YouTubeOverlay;
 import com.github.vkay94.dtpv.youtube.YouTubeOverlay.PerformListener;
-import com.google.android.exoplayer2.ControlDispatcher;
-import com.google.android.exoplayer2.DefaultControlDispatcher;
+import com.google.android.exoplayer2.ForwardingPlayer;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -418,7 +417,6 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         }
         if (mMediaSessionConnector != null) {
             mMediaSessionConnector.setPlayer(null);
-            mMediaSessionConnector.setControlDispatcher(null);
             mMediaSessionConnector.setMediaMetadataProvider(null);
             mMediaSessionConnector.setQueueNavigator(null);
             mMediaSessionConnector = null;
@@ -479,7 +477,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
     private void createPlayer() {
         // Use default or pass your bandwidthMeter here: bandwidthMeter = new DefaultBandwidthMeter.Builder(getContext()).build()
-        DefaultTrackSelector trackSelector = new RestoreTrackSelector(new AdaptiveTrackSelection.Factory());
+        DefaultTrackSelector trackSelector = new RestoreTrackSelector(getContext(), new AdaptiveTrackSelection.Factory());
         mExoPlayerController.setTrackSelector(trackSelector);
 
         DefaultRenderersFactory renderersFactory = new CustomOverridesRenderersFactory(getContext());
@@ -514,7 +512,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
             // subs renderer
             if (mPlayer.getTextComponent() != null) {
-                mPlayer.getTextComponent().addTextOutput(mSubtitleManager);
+                mPlayer.addListener(mSubtitleManager);
             }
         }
     }
@@ -651,28 +649,32 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             }
 
             @Override
-            public void onSkipToPrevious(Player player, ControlDispatcher controlDispatcher) {
+            public void onSkipToPrevious(Player player) {
                 mPlaybackPresenter.onPreviousClicked();
             }
 
             @Override
-            public void onSkipToNext(Player player, ControlDispatcher controlDispatcher) {
+            public void onSkipToNext(Player player) {
                 mPlaybackPresenter.onNextClicked();
             }
         });
 
         // Fix exoplayer pause when switching AFR. The code seems buggy.
-        mMediaSessionConnector.setControlDispatcher(new DefaultControlDispatcher() {
+        //
+        // ControlDispatcher was removed upstream -- the session drives the Player directly -- so the
+        // suppression moves into a ForwardingPlayer wrapping the one the session sees. Same effect,
+        // and it only affects session-originated commands, not the app's own calls.
+        mMediaSessionConnector.setPlayer(new ForwardingPlayer(mPlayer) {
             @Override
-            public boolean dispatchSetPlayWhenReady(Player player, boolean playWhenReady) {
+            public void setPlayWhenReady(boolean playWhenReady) {
                 // Fix exoplayer pause after activity is resumed (AFR switching).
                 // It's tied to activity state transitioning because window has different mode.
                 // NOTE: may be a problems with background playback or bluetooth button events
                 if (System.currentTimeMillis() - getPlayerData().getAfrSwitchTimeMs() < 5_000) {
-                    return false;
+                    return;
                 }
 
-                return super.dispatchSetPlayWhenReady(player, playWhenReady);
+                super.setPlayWhenReady(playWhenReady);
             }
         });
     }

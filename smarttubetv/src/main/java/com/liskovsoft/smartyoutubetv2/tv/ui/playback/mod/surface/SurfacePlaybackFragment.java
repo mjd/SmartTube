@@ -25,6 +25,14 @@ import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
 public class SurfacePlaybackFragment extends PlaybackSupportFragment {
     private SurfaceWrapper mVideoSurfaceWrapper;
     private AspectRatioFrameLayout mVideoSurfaceRoot;
+    /**
+     * Zoom percentage, -1 when unset.
+     *
+     * <p>The vendored player patched setZoom/getZoom onto AspectRatioFrameLayout, which is final
+     * upstream and so cannot be subclassed. Zoom is only a scale transform, so the state lives
+     * here and is applied to the view directly -- no player change needed at all.
+     */
+    private int mZoomPercents = -1;
     private SubtitleView mLeanbackSubtitles;
     private int mSubtitlesPadding;
     private int mBackgroundResId;
@@ -94,7 +102,7 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
     }
 
     protected void setZoom(int percents) {
-        mVideoSurfaceRoot.setZoom(percents);
+        setSurfaceZoom(percents);
     }
 
     protected void setAspect(float aspectRatio) {
@@ -225,10 +233,23 @@ public class SurfacePlaybackFragment extends PlaybackSupportFragment {
     private int calculateZoom() {
         View parent = (View) mLeanbackSubtitles.getParent();
         int widthRatio = mVideoSurfaceRoot.getWidth() * 100 / parent.getWidth();
-        return mVideoSurfaceRoot.getZoom() * widthRatio / 100;
+        return mZoomPercents * widthRatio / 100;
     }
 
     private float calculateAspectRatio() {
         return (mAspectRatio == 0 ? mVideoAspectRatio : mAspectRatio) * mPixelRatio;
+    }
+
+    private void setSurfaceZoom(int zoomPercents) {
+        mZoomPercents = zoomPercents;
+
+        if (mVideoSurfaceRoot == null) {
+            return;
+        }
+
+        float scale = zoomPercents > 0 ? zoomPercents / 100f : 1;
+        mVideoSurfaceRoot.setScaleX(scale);
+        mVideoSurfaceRoot.setScaleY(scale);
+        mVideoSurfaceRoot.requestLayout();
     }
 }

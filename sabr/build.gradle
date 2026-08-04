@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion project.properties.minSdkVersion
+        minSdkVersion rootProject.ext.migrationMinSdk
         targetSdkVersion project.properties.targetSdkVersion
     }
 

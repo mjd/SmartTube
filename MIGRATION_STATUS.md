@@ -124,3 +124,46 @@ Dominant causes:
 - **`ChunkExtractorWrapper` no longer exists** (5 errors) -- replaced by the `ChunkExtractor`
   interface and `BundledChunkExtractor`. The genuine redesign in this port.
 - **`Format` factories and the vendored `lastModified` field**, same as everywhere else.
+
+
+---
+
+## Milestone A reached: the app builds and the tests run
+
+`assembleStbetaDebug` produces a **31 MB APK against Maven ExoPlayer 2.19.1**, and all **25 unit
+tests pass**. That is the first real validation this migration has had — everything before it was
+"it compiles".
+
+The most important green light is `ExoFormatItemWireCompatTest`: the persisted preference string
+survived the `Format.Builder` rewrite intact, so saved quality settings still round-trip
+byte-for-byte. That was the single largest silent-regression risk in the plan.
+
+### minSdk is 21, not 19 — earlier note corrected
+
+`extension-okhttp:2.19.1` declares **minSdk 21**; every other ExoPlayer artifact we use declares 16.
+The P0.4 spike only measured `exoplayer-core`, so the earlier "17 → 19, not 21" conclusion was wrong
+for the full dependency set. Fire TV Gen1 and Stick Gen1 are lost after all — the original decision
+was right. Set via `ext.migrationMinSdk` in the root `build.gradle` so the SharedModules submodule
+stays untouched.
+
+### SABR is switched off
+
+`VideoLoaderController.SABR_SUPPORTED = false` skips the SABR branch, so a response offering SABR
+falls through to the live-DASH, HLS and URL-list branches rather than opening a source that cannot
+play. `buildSabrMediaSource` returns null as a second line of defence, and `:common` no longer
+depends on `:sabr`.
+
+This is invisible on hardware being served DASH — which is the case on the test TV — but it is a
+real capability gap for anyone YouTube has already migrated to SABR. The module still has 20 errors
+in two files; see the section above.
+
+### Other things now missing or moved, beyond SABR
+
+- **Subtitle bot-check visitor cookie** — regression, see PLAYER_DELTAS.md
+- **DRC detection on two of three format paths** — degrades to "not DRC", which is the safe direction
+- **`AmazonQuirks`** — dropped; needs Fire TV validation
+- **Zoom** moved out of the player: `AspectRatioFrameLayout` is `final` upstream, so the percentage
+  now lives in `SurfacePlaybackFragment` and is applied as a scale transform. No player change needed
+- **`ControlDispatcher`** removed: the AFR pause fix became a `ForwardingPlayer` wrapping the player
+  the media session sees, so it still only affects session-originated commands
+- **`SubtitleManager`** registers as a `Player.Listener`; there is no text component to attach to
