@@ -54,8 +54,8 @@ These are genuine SmartTube behaviour. None require forking Media3.
 
 | File | Δ | Behaviour | Destination |
 |---|---|---|---|
-| `core/upstream/DataSpec.java` | 86 | googlevideo throttle range fix; imports `com.liskovsoft.sharedutils.Helpers` **from inside the fork** | `ResolvingDataSource.Factory` in `ExoMediaSourceFactory` (plan P1) |
-| `core/upstream/DefaultHttpDataSource.java` | 14 | Headers from `DataSpec` (**native since 2.14 — drop**); TLS ciphers/DNS (**already disabled in-tree**) | Mostly DROP; remainder via `OkHttpDataSource.Factory` with the existing `OkHttpManager` client |
+| `core/upstream/DataSpec.java` | 86 | googlevideo throttle range fix | **DONE — DELETED.** The call site was commented out, so `applyRangeQuery()` was dead code; `Helpers` was used nowhere else in the file. Removed rather than ported — porting dead code would have been worse than not porting it |
+| `core/upstream/DefaultHttpDataSource.java` | 14 | TLS ciphers/DNS; headers from `DataSpec` | **Partly DONE.** The `NetworkHelpers` TLS/DNS line was already commented out with a `TODO` about API 34 — deleted along with its import. The header loop stays live until the swap, where it is **DROP** (native since 2.14) |
 | `ext/cronet/CronetDataSource.java` | — | Same header change | **DROP** — native |
 | `ext/okhttp/OkHttpDataSource.java` | — | Same header change | **DROP** — native |
 | `ext/cronet/CronetEngineWrapper.java` | — | QUIC enable; noted in-tree as unused (replaced by `sharedutils.cronet.CronetManager`) | **DELETE** |
@@ -99,3 +99,10 @@ These are genuine SmartTube behaviour. None require forking Media3.
 that was manually backported into 2.10.6, and it disappears at no cost. Exactly one delta
 (`MediaCodecVideoRenderer`'s `isBufferLate` visibility) has no public-API equivalent and needs a local
 reimplementation. Nothing in this table requires forking Media3.
+
+**Blocker 6 is nearly empty.** The plan treated "fork mods that import `com.liskovsoft.*` from inside
+the vendored player" as a structural obstacle, since a Maven-consumed player cannot be patched that
+way. In practice both networking offenders were **dead code** — the googlevideo range fix and the
+TLS/DNS override were each disabled at their call site — and have been deleted. Two cross-layer
+imports remain outside SABR: `ui/SubtitlePainter` (subtitle span helpers) and `dash/DashManifestParser2`
+(SmartTube-authored, moves app-side at P5). Neither blocks consuming the player from Maven.
