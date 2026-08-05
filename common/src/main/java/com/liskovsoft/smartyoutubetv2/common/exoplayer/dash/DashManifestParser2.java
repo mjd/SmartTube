@@ -75,6 +75,22 @@ public class DashManifestParser2 {
     private DashManifest parseDashManifest(MediaItemFormatInfo formatInfo) {
         long availabilityStartTime = C.TIME_UNSET;
         long durationMs = getDurationMs(formatInfo);
+
+        // A live stream reports no length, so durationMs would be C.TIME_UNSET. That is fine on a
+        // dynamic manifest but this one is static, and DefaultDashChunkSource clips a static period
+        // against its duration:
+        //
+        //     if (periodEnded && getSegmentStartTimeUs(segmentNum) >= periodDurationUs) endOfStream
+        //
+        // C.TIME_UNSET is Long.MIN_VALUE + 1, so every real segment time compares >= it and the
+        // first media chunk is refused -- playback stops as if the video had ended. ExoPlayer 2.10.6
+        // never reached that line because it derived periodEnded solely from the duration
+        // (periodDurationUs != C.TIME_UNSET, i.e. false here); 2.19 derives it from the manifest
+        // being static (!isLastPeriodInDynamicManifest), which is always true for us. Publish the
+        // synthetic window length so the clip compares against a real bound.
+        if (durationMs == C.TIME_UNSET && formatInfo.isLive()) {
+            durationMs = MAX_DURATION_SEC * 1_000L;
+        }
         long minBufferTimeMs = 1500; // "PT1.500S"
         long timeShiftBufferDepthMs = C.TIME_UNSET;
         long suggestedPresentationDelayMs = C.TIME_UNSET;
