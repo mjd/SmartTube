@@ -92,7 +92,8 @@ public class ExoFormatItem implements FormatItem {
             if (format.id != null) {
                 formatItem.mId = format.id.hashCode();
                 formatItem.mFormatId = format.id;
-                formatItem.mIsDrc = format.isDrc;
+                // Format.isDrc was a vendored-player addition; DRC is now read from the id suffix.
+                formatItem.mIsDrc = TrackSelectorUtil.isDrc(format);
             }
         } else {
             formatItem.mIsDefault = true; // fake auto track
@@ -133,7 +134,7 @@ public class ExoFormatItem implements FormatItem {
                 frameRate = format.frameRate;
                 language = format.language;
                 bitrate = format.bitrate;
-                isDrc = format.isDrc;
+                isDrc = TrackSelectorUtil.isDrc(format);
             }
         }
 
@@ -190,20 +191,32 @@ public class ExoFormatItem implements FormatItem {
         }
 
         // NOTE: Create fake format. It's used in app internal comparison routine.
+        // The createXSampleFormat factories were removed upstream in favour of Format.Builder.
+        // Only the fields the comparison routine reads are set; everything else stays at its unset
+        // default, matching what the factories produced for the arguments passed here.
         switch (type) {
             case TYPE_VIDEO:
-                mediaTrack.format = Format.createVideoSampleFormat(
-                        id, null, codecs, -1, -1, width, height,
-                        frameRate, null, null);
+                mediaTrack.format = new Format.Builder()
+                        .setId(id)
+                        .setCodecs(codecs)
+                        .setWidth(width)
+                        .setHeight(height)
+                        .setFrameRate(frameRate)
+                        .build();
                 break;
             case TYPE_AUDIO:
-                mediaTrack.format = Format.createAudioSampleFormat(
-                        id, null, codecs, bitrate, -1,0, 0,
-                        null, null, 0, language, isDrc);
+                mediaTrack.format = new Format.Builder()
+                        .setId(id)
+                        .setCodecs(codecs)
+                        .setAverageBitrate(bitrate)
+                        .setLanguage(language)
+                        .build();
                 break;
             case TYPE_SUBTITLE:
-                mediaTrack.format = Format.createTextSampleFormat(
-                        id, null, -1, language);
+                mediaTrack.format = new Format.Builder()
+                        .setId(id)
+                        .setLanguage(language)
+                        .build();
                 break;
         }
 
@@ -307,8 +320,12 @@ public class ExoFormatItem implements FormatItem {
         }
 
         // Fake format. It's used in app internal comparison routine.
-        mediaTrack.format = Format.createVideoSampleFormat(
-                null, null, codec, -1, -1, width, height, fps, null, null);
+        mediaTrack.format = new Format.Builder()
+                .setCodecs(codec)
+                .setWidth(width)
+                .setHeight(height)
+                .setFrameRate(fps)
+                .build();
 
         return formatItem;
     }
@@ -329,8 +346,9 @@ public class ExoFormatItem implements FormatItem {
         }
 
         // Fake format. It's used in app internal comparison routine.
-        mediaTrack.format = Format.createAudioSampleFormat(
-                null, null, codec, -1, -1,0, 0, null, null, 0, null);
+        mediaTrack.format = new Format.Builder()
+                .setCodecs(codec)
+                .build();
 
         return formatItem;
     }
@@ -370,7 +388,9 @@ public class ExoFormatItem implements FormatItem {
         formatItem.mLanguage = langCode;
         formatItem.mIsDefault = langCode == null;
 
-        mediaTrack.format = Format.createTextSampleFormat(null, null, -1, langCode);
+        mediaTrack.format = new Format.Builder()
+                .setLanguage(langCode)
+                .build();
 
         return formatItem;
     }

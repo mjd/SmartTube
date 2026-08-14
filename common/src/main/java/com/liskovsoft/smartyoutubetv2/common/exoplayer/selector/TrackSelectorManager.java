@@ -13,7 +13,7 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.Paramet
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.SelectionOverride;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
-import com.google.android.exoplayer2.trackselection.TrackSelection.Definition;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection.Definition;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.AudioTrack;
@@ -353,11 +353,12 @@ public class TrackSelectorManager implements TrackSelectorCallback {
             SelectionOverride override = params.getSelectionOverride(rendererIndex, rendererTrackGroups);
 
             if (override != null) {
-                definition = new TrackSelection.Definition(
+                // SelectionOverride's separate reason/data pair was collapsed into a single
+                // selection type upstream.
+                definition = new Definition(
                                 rendererTrackGroups.get(override.groupIndex),
                                 override.tracks,
-                                override.reason,
-                                override.data);
+                                override.type);
             }
         }
 

@@ -44,6 +44,48 @@ jobs:
       - name: Grant Gradle permissions
         run: chmod +x gradlew
 
+      - name: Guard against new reflection into player internals
+        # Reflective field pokes into ExoPlayer internals fail silently rather than at compile
+        # time: they survive a player upgrade looking healthy and then break at runtime. 32 such
+        # sites exist today (LiveDashManifestParser 26, DelayMediaCodecAudioRenderer 5,
+        # TrackErrorFixer 1) and are scheduled for removal. This is a ratchet, not a ban -- it
+        # blocks new ones and should be lowered as the existing ones go.
+        env:
+          REFLECTION_BASELINE: 32
+        run: |
+          COUNT=$(grep -rn -E 'Helpers\.(get|set)Field' --include='*.java' \
+                    common/src/main/java/com/liskovsoft/smartyoutubetv2/common/exoplayer/ | wc -l | tr -d ' ')
+          echo "Reflection sites: $COUNT (baseline $REFLECTION_BASELINE)"
+          if [ "$COUNT" -gt "$REFLECTION_BASELINE" ]; then
+            grep -rn -E 'Helpers\.(get|set)Field' --include='*.java' \
+              common/src/main/java/com/liskovsoft/smartyoutubetv2/common/exoplayer/
+            echo "::error::New reflection into player internals ($COUNT > $REFLECTION_BASELINE)."
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$REFLECTION_BASELINE" ]; then
+            echo "::notice::Reflection sites reduced to $COUNT -- lower REFLECTION_BASELINE."
+          fi
+
+      - name: Unit Tests
+        # Scoped to the plain-JUnit suites on purpose. A bare './gradlew test' also runs the
+        # legacy Robolectric suites, which cannot start under the JDK 17 this build requires
+        # (ASM cannot read modern class files) and would fail for reasons unrelated to the code.
+        #
+        # The ':exoplayer-library-core' suite that used to run here is gone: the vendored player is
+        # no longer part of the build, so the task no longer exists and the step failed outright.
+        # ':sabr' replaces it as the second module with tests of its own.
+        run: |
+          ./gradlew :common:testStbetaDebugUnitTest
+          ./gradlew :sabr:testStbetaDebugUnitTest
+
+      - name: Upload Test Report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: test-report
+          path: '**/build/reports/tests/**'
+          if-no-files-found: warn
+
       - name: Lint with Gradle
         run: ./gradlew lintStbetaRelease
 

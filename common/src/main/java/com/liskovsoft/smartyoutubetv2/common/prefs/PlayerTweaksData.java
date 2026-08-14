@@ -56,6 +56,16 @@ public class PlayerTweaksData implements ProfileChangeListener {
     private boolean mIsAmlogicFixEnabled;
     private boolean mIsAmazonFrameDropFixEnabled;
     private boolean mIsSonyFrameDropFixEnabled;
+    private boolean mIsMtkVp9AdaptationFixEnabled;
+    /**
+     * Retired: the setting disabled vsync alignment of frame release, which the player no longer
+     * exposes -- VideoFrameReleaseHelper is constructed internally with no hook to replace it.
+     *
+     * <p>The field stays because it occupies <b>slot 2</b> of the persisted string, which is
+     * positional: removing it would shift every later slot by one and silently turn every saved
+     * tweak into a different setting. Nothing reads the value any more -- it is carried purely to
+     * hold the slot. See the matching notes in {@code restoreData()} and {@code persistDataInt()}.
+     */
     private boolean mIsSnapToVsyncDisabled;
     private boolean mIsProfileLevelCheckSkipped;
     private boolean mIsSWDecoderForced;
@@ -134,6 +144,15 @@ public class PlayerTweaksData implements ProfileChangeListener {
         persistData();
     }
 
+    public boolean isMtkVp9AdaptationFixEnabled() {
+        return mIsMtkVp9AdaptationFixEnabled;
+    }
+
+    public void setMtkVp9AdaptationFixEnabled(boolean enable) {
+        mIsMtkVp9AdaptationFixEnabled = enable;
+        persistData();
+    }
+
     public boolean isAmazonFrameDropFixEnabled() {
         return mIsAmazonFrameDropFixEnabled;
     }
@@ -149,15 +168,6 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
     public void setSonyFrameDropFixEnabled(boolean enable) {
         mIsSonyFrameDropFixEnabled = enable;
-        persistData();
-    }
-
-    public boolean isSnappingToVsyncDisabled() {
-        return mIsSnapToVsyncDisabled;
-    }
-
-    public void setSnappingToVsyncDisabled(boolean disable) {
-        mIsSnapToVsyncDisabled = disable;
         persistData();
     }
 
@@ -698,6 +708,11 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
         mIsAmlogicFixEnabled = Helpers.parseBoolean(split, 0, false);
         mIsAmazonFrameDropFixEnabled = Helpers.parseBoolean(split, 1, false);
+        // RESERVED SLOT 2 -- do not reuse or remove.
+        // The vsync setting is retired (see the field), but this slot must keep being read and
+        // written. These are positional: dropping it shifts every later index by one, so every
+        // saved tweak on every device silently becomes a different setting.
+        // To retire another setting, do the same -- leave the slot, remove the UI.
         mIsSnapToVsyncDisabled = Helpers.parseBoolean(split, 2, false);
         mIsProfileLevelCheckSkipped = Helpers.parseBoolean(split, 3, false);
         mIsSWDecoderForced = Helpers.parseBoolean(split, 4, false);
@@ -762,6 +777,10 @@ public class PlayerTweaksData implements ProfileChangeListener {
         mIsQuickSkipVideosAltEnabled = Helpers.parseBoolean(split, 58, false);
         mIsAudioTimeStretchingEnabled = Helpers.parseBoolean(split, 59, true);
         mIsQueueRespectsPlaybackMode = Helpers.parseBoolean(split, 60, false);
+        // Off by default: forcing a codec re-init costs ~170ms of decoder teardown/start plus a
+        // keyframe resume, and it isn't yet confirmed that seamless adaptation is what provokes the
+        // MediaTek VP9 decoder fault. Opt-in until there's evidence.
+        mIsMtkVp9AdaptationFixEnabled = Helpers.parseBoolean(split, 61, false);
 
         updateDefaultValues();
     }
@@ -776,6 +795,7 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
     private void persistDataInt() {
         mPrefs.setProfileData(VIDEO_PLAYER_TWEAKS_DATA, Helpers.mergeData(
+                // mIsSnapToVsyncDisabled holds reserved slot 2 -- retired setting, see restoreData().
                 mIsAmlogicFixEnabled, mIsAmazonFrameDropFixEnabled, mIsSnapToVsyncDisabled,
                 mIsProfileLevelCheckSkipped, mIsSWDecoderForced, mIsTextureViewEnabled,
                 null, mIsSetOutputSurfaceWorkaroundEnabled, mIsAudioSyncFixEnabled, mIsKeepFinishedActivityEnabled, mIsHlsStreamsForced,
@@ -789,7 +809,8 @@ public class PlayerTweaksData implements ProfileChangeListener {
                 mIsUnsafeAudioFormatsEnabled, null, mIsLoopShortsEnabled, mIsQuickSkipShortsEnabled, mIsRememberPositionOfLiveVideosEnabled,
                 mIsOculusQuestFixEnabled, null, mIsExtraLongSpeedListEnabled, mIsQuickSkipVideosEnabled, mIsNetworkErrorFixingDisabled, mIsCommentsPlacedLeft,
                 null, mIsAudioFocusEnabled, mIsDontResizeVideoToFitDialogEnabled, mIsSuggestionsHorizontallyScrolled,
-                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode
+                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode,
+                mIsMtkVp9AdaptationFixEnabled
                 ));
     }
 

@@ -75,10 +75,7 @@ public class BlacklistMediaCodecSelector implements MediaCodecSelector {
         return filteredCodecInfos;
     }
 
-    // Exo 2.10
-    @Nullable
-    @Override
-    public MediaCodecInfo getPassthroughDecoderInfo() throws MediaCodecUtil.DecoderQueryException {
-        return MediaCodecUtil.getPassthroughDecoderInfo();
-    }
+    // getPassthroughDecoderInfo() was removed from MediaCodecSelector upstream. Passthrough
+    // decoder selection moved into getDecoderInfos() (via the RAW mime type) and DefaultAudioSink /
+    // AudioCapabilities, so there is nothing left to delegate here.
 }

@@ -31,8 +31,16 @@ if (keystorePropertiesFile.exists()) {
 }
 
 // The first letter of the flavor name must be in uppercase
-if (new File("${projectDir}/google-services.json").exists() && (getGradle().getStartParameter().getTaskRequests().toString().contains("Stbeta") ||
-        getGradle().getStartParameter().getTaskRequests().toString().contains("Ststable"))) {
+def taskRequests = getGradle().getStartParameter().getTaskRequests().toString()
+
+// Debug builds are excluded deliberately, for two reasons. The checked-in google-services.json
+// belongs to the maintainer's "smarttube-tv" Firebase project and registers only the three released
+// package names, so the plugin hard-fails on the .debug applicationId above with "No matching client
+// found". Registering a client for it would fix the build by pointing local experimental builds at
+// someone else's Crashlytics -- our decoder crashes are exactly the noise their release data should
+// not carry. Debug builds get no Firebase at all instead; logcat is the channel for them.
+if (new File("${projectDir}/google-services.json").exists() && !taskRequests.contains("Debug") &&
+        (taskRequests.contains("Stbeta") || taskRequests.contains("Ststable"))) {
     // Google Services Gradle plugin (transforms google-services.json file)
     apply plugin: 'com.google.gms.google-services'
 
@@ -55,7 +63,7 @@ android {
     defaultConfig {
         // values linked with applicationId: searchable.searchSuggestAuthority, searchable.searchSuggestIntentData, VideoContract.CONTENT_AUTHORITY
         applicationId "app.smarttube"
-        minSdkVersion project.properties.minSdkVersion
+        minSdkVersion rootProject.ext.migrationMinSdk
         targetSdkVersion project.properties.targetSdkVersion
         versionCode 2400
         versionName "32.10"
@@ -113,6 +121,17 @@ android {
         }
         // Use same key for release and debug for testing
         debug {
+            // Install alongside the official build rather than on top of it. Without the suffix the
+            // debug APK claims org.smarttube.beta, which is the published beta: it is signed with
+            // the project's key, so the install is rejected outright as a signature mismatch, and
+            // the only way through would be uninstalling the real app and its data. Side-by-side
+            // also keeps a known-good build on the device to compare a suspect one against.
+            applicationIdSuffix ".debug"
+
+            // Distinguishes migration builds from the stock 32.10 in the About screen and in
+            // dumpsys, which is the only way to tell which player a soak report came from.
+            versionNameSuffix "-migrated"
+
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
@@ -194,18 +213,18 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
-    implementation project(':exoplayer-library-core')
-    implementation project(':exoplayer-library-ui')
-    implementation project(':exoplayer-extension-leanback')
-    implementation project(':exoplayer-extension-mediasession')
+    implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-ui:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-leanback:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-mediasession:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.amazon.android:exoplayer:' + amazonExoplayerVersion
     // implementation 'com.amazon.android:extension-leanback:' + amazonExoplayerVersion
     // implementation 'com.amazon.android:extension-mediasession:' + amazonExoplayerVersion
 
-    // implementation 'com.google.android.exoplayer:exoplayer:' + exoplayerVersion
-    // implementation 'com.google.android.exoplayer:extension-leanback:' + exoplayerVersion
-    // implementation 'com.google.android.exoplayer:extension-mediasession:' + exoplayerVersion
+    // implementation 'com.google.android.exoplayer:exoplayer:' + rootProject.ext.exoplayerMigrationVersion
+    // implementation 'com.google.android.exoplayer:extension-leanback:' + rootProject.ext.exoplayerMigrationVersion
+    // implementation 'com.google.android.exoplayer:extension-mediasession:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.github.amzn:exoplayer-amazon-port:' + amazonExoplayerJitpackVersion
 

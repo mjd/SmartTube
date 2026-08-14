@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.exoplayer.selector;
 import android.text.TextUtils;
 import android.util.Pair;
 import com.google.android.exoplayer2.Format;
+import com.liskovsoft.smartyoutubetv2.player.extras.FormatExtras;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.liskovsoft.sharedutils.helpers.Helpers;
@@ -212,8 +213,21 @@ public class TrackSelectorUtil {
         return isDrc(format) ? "DRC" : "";
     }
 
+    /**
+     * Whether this is a DRC (dynamic range compressed) audio format.
+     *
+     * <p>Two carriers, because the producers disagree. The MPD builder encodes DRC into the id as
+     * {@code <itag>-drc}; the DASH and SABR parsers attach a {@link FormatExtras} marker instead. The vendored player's extra {@code Format.isDrc} field is not something a
+     * Maven-consumed player can be given, and the id cannot simply be rewritten to unify them --
+     * it is field 3 of the persisted preference string, so changing it would invalidate saved
+     * audio selections.
+     *
+     * <p>Both the DASH and SABR parsers attach the marker, so between the two carriers every
+     * producer is covered.
+     */
     public static boolean isDrc(Format format) {
-        return format != null && (Helpers.endsWithAny(format.id, "drc") || format.isDrc);
+        return format != null
+                && (Helpers.endsWithAny(format.id, "drc") || FormatExtras.isDrc(format.metadata));
     }
 
     public static boolean is51Audio(Format format) {

@@ -1,0 +1,80 @@
+// SABR: SmartTube's implementation of YouTube's server-side ABR streaming protocol.
+//
+// Promoted out of the vendored ExoPlayer tree (library/sabr) into a first-party module when the
+// player became a Maven dependency. It exists in no upstream ExoPlayer or Media3 release, so it has
+// to live here regardless of which player version we consume.
+//
+// The package name is deliberately left as com.google.android.exoplayer2.source.sabr for now: it is
+// our own package, not one the player also defines, so nothing is split -- and keeping it avoids
+// rewriting imports across 63 files while the API port is in flight. Renaming to a liskovsoft
+// package is a follow-up.
+plugins {
+    id "com.google.protobuf" version "0.9.5"
+}
+
+apply from: gradle.ext.sharedModulesConstants
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion project.properties.compileSdkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.migrationMinSdk
+        targetSdkVersion project.properties.targetSdkVersion
+    }
+
+    testOptions.unitTests.includeAndroidResources = true
+
+    // Unit tests run against AGP's "mockable" android.jar, whose methods throw by default. Returning
+    // type defaults instead lets plain-JUnit suites exercise code that merely touches an Android
+    // type in passing. Matches :common. Shadow a class under src/test/java when a default is
+    // actively wrong rather than merely unused.
+    testOptions.unitTests.returnDefaultValues = true
+
+    flavorDimensions "default"
+
+    productFlavors {
+        stbeta {}
+        ststable {}
+        stfdroid {}
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-dash:' + rootProject.ext.exoplayerMigrationVersion
+
+    // Plain JUnit only, deliberately. Robolectric cannot start under the JDK 17 this build requires,
+    // and the parts of this module worth testing -- the protocol layer and the format carriers --
+    // are pure JVM code by design.
+    testImplementation 'junit:junit:' + junitVersion
+
+    implementation project(':mediaserviceinterfaces')
+    implementation project(':sharedutils')
+    implementation project(':youtubeapi')
+
+    compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    implementation 'androidx.annotation:annotation:' + annotationXVersion
+    implementation 'com.google.protobuf:protobuf-javalite:' + rootProject.ext.protobufVersion
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:' + rootProject.ext.protobufVersion
+    }
+
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.builtins {
+                java {
+                    option "lite"
+                }
+            }
+        }
+    }
+}

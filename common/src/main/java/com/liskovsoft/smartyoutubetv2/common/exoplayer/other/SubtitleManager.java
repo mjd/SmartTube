@@ -11,9 +11,10 @@ import android.view.accessibility.CaptioningManager.CaptionStyle;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
-import com.google.android.exoplayer2.text.CaptionStyleCompat;
+import com.google.android.exoplayer2.ui.CaptionStyleCompat;
 import com.google.android.exoplayer2.text.Cue;
-import com.google.android.exoplayer2.text.TextOutput;
+import com.google.android.exoplayer2.text.CueGroup;
+import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.ui.SubtitleView;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
@@ -24,7 +25,9 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SubtitleManager implements TextOutput, OnDataChange {
+// TextOutput's onCues moved onto Player.Listener; the player has no text component to
+// register with any more.
+public class SubtitleManager implements Player.Listener, OnDataChange {
     private static final String TAG = SubtitleManager.class.getSimpleName();
     private final SubtitleView mSubtitleView;
     private final Context mContext;
@@ -70,9 +73,9 @@ public class SubtitleManager implements TextOutput, OnDataChange {
     }
 
     @Override
-    public void onCues(List<Cue> cues) {
+    public void onCues(CueGroup cueGroup) {
         if (mSubtitleView != null) {
-            mSubtitleView.setCues(forceCenterAlignment(cues));
+            mSubtitleView.setCues(forceCenterAlignment(cueGroup.cues));
         }
     }
 
@@ -95,6 +98,17 @@ public class SubtitleManager implements TextOutput, OnDataChange {
         configureSubtitleView();
     }
 
+    /**
+     * Builds a text-only cue with no positioning, which the subtitle view renders centred.
+     *
+     * <p>Replaces the old {@code new Cue(CharSequence)} constructor, removed upstream in favour of
+     * {@link Cue.Builder}. Setting only the text leaves every position/alignment field at its unset
+     * default, which is what the previous constructor did.
+     */
+    private static Cue centeredCue(CharSequence text) {
+        return new Cue.Builder().setText(text).build();
+    }
+
     private List<Cue> forceCenterAlignment(List<Cue> cues) {
         List<Cue> result = new ArrayList<>();
 
@@ -114,13 +128,13 @@ public class SubtitleManager implements TextOutput, OnDataChange {
                     text = textStr;
                 }
 
-                result.add(new Cue(text)); // sub centered by default
+                result.add(centeredCue(text)); // sub centered by default
 
                 String[] split = textStr.split("\n");
                 subsBuffer = split.length == 2 ? split[1] : textStr;
             } else {
                 CharSequence text = subsBuffer != null ? textStr.replace(subsBuffer, "") : textStr;
-                result.add(new Cue(text)); // sub centered by default
+                result.add(centeredCue(text)); // sub centered by default
                 subsBuffer = text;
             }
         }

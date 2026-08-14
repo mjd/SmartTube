@@ -5,11 +5,19 @@ import android.os.Build.VERSION;
 
 import androidx.annotation.Nullable;
 
+import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.audio.AudioListener;
 import com.liskovsoft.sharedutils.mylogger.Log;
 
-public class VolumeBooster implements AudioListener {
+/**
+ * Boosts playback volume beyond the system maximum via {@link LoudnessEnhancer}.
+ *
+ * <p>Listens as a {@link Player.Listener}: the separate {@code AudioListener} interface (and the
+ * {@code addAudioListener}/{@code removeAudioListener} accessors) were folded into
+ * {@code Player.Listener} upstream, with {@code onAudioSessionId} renamed to
+ * {@link #onAudioSessionIdChanged(int)}.
+ */
+public class VolumeBooster implements Player.Listener {
     private static final String TAG = VolumeBooster.class.getSimpleName();
     private boolean mIsEnabled;
     private final float mVolume;
@@ -25,7 +33,7 @@ public class VolumeBooster implements AudioListener {
     }
 
     @Override
-    public void onAudioSessionId(int audioSessionId) {
+    public void onAudioSessionIdChanged(int audioSessionId) {
         if (VERSION.SDK_INT < 19 || mVolume <= 1) {
             return;
         }

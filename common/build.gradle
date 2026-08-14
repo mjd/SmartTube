@@ -2,6 +2,10 @@ apply from: gradle.ext.sharedModulesConstants
 apply plugin: 'kotlin-android'
 apply plugin: 'com.android.library'
 
+tasks.withType(JavaCompile) {
+    options.compilerArgs << '-Xmaxerrs' << '2000'
+}
+
 android {
     // FIX: Default interface methods are only supported starting with Android N (--min-api 24)
     compileOptions {
@@ -12,9 +16,12 @@ android {
     compileSdkVersion project.properties.compileSdkVersion
     buildToolsVersion project.properties.buildToolsVersion
     testOptions.unitTests.includeAndroidResources = true
+    // Allow plain-JUnit tests (no Robolectric, which can't run under the JDK 17 this build needs)
+    // to exercise code that touches android.* stubs.
+    testOptions.unitTests.returnDefaultValues = true
 
     defaultConfig {
-        minSdkVersion project.properties.minSdkVersion
+        minSdkVersion rootProject.ext.migrationMinSdk
         targetSdkVersion project.properties.targetSdkVersion
         versionCode 10
         versionName "1.0"
@@ -69,15 +76,20 @@ dependencies {
 
     //////// BEGIN EXOPLAYER /////////
 
-    implementation project(':exoplayer-library')
-    implementation project(':exoplayer-extension-okhttp')
-    implementation project(':exoplayer-extension-cronet')
+    implementation project(':sabr')
+    implementation 'com.google.android.exoplayer:exoplayer-core:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-dash:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-hls:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-smoothstreaming:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:exoplayer-ui:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-okhttp:' + rootProject.ext.exoplayerMigrationVersion
+    implementation 'com.google.android.exoplayer:extension-cronet:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.amazon.android:exoplayer:' + amazonExoplayerVersion
     // implementation 'com.amazon.android:extension-okhttp:' + amazonExoplayerVersion
 
-    // implementation 'com.google.android.exoplayer:exoplayer:' + exoplayerVersion
-    // implementation 'com.google.android.exoplayer:extension-okhttp:' + exoplayerVersion
+    // implementation 'com.google.android.exoplayer:exoplayer:' + rootProject.ext.exoplayerMigrationVersion
+    // implementation 'com.google.android.exoplayer:extension-okhttp:' + rootProject.ext.exoplayerMigrationVersion
 
     // implementation 'com.github.amzn:exoplayer-amazon-port:' + amazonExoplayerJitpackVersion
 

@@ -30,6 +30,16 @@ import io.reactivex.disposables.Disposable;
 
 public class VideoLoaderController extends BasePlayerController {
     private static final String TAG = VideoLoaderController.class.getSimpleName();
+    /**
+     * Kill switch for the SABR path.
+     *
+     * <p>Guarding the dispatch rather than stubbing {@code openSabr} means the degradation is
+     * graceful when off: the branch is skipped, so a response offering SABR falls through to the
+     * live-DASH, HLS and URL-list branches instead of opening a source that cannot play. Kept
+     * because SABR is the least-tested part of the player and this is the fastest way to rule it
+     * out if playback misbehaves.
+     */
+    private static final boolean SABR_SUPPORTED = true;
     private static final int MIN_SHUFFLE_SIZE = 30;
     private final Playlist mPlaylist;
     private Video mPendingVideo;
@@ -341,7 +351,7 @@ public class VideoLoaderController extends BasePlayerController {
             } else {
                 player.openDash(formatInfo);
             }
-        } else if (acceptAdaptiveFormats(formatInfo) && formatInfo.containsSabrFormats()) {
+        } else if (SABR_SUPPORTED && acceptAdaptiveFormats(formatInfo) && formatInfo.containsSabrFormats()) {
             Log.d(TAG, "Loading video in sabr format...");
             player.openSabr(formatInfo);
         } else if (acceptDashLive(formatInfo)) {

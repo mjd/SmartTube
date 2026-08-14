@@ -1,21 +1,21 @@
 package com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector;
 
+import android.content.Context;
 import android.util.Pair;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.trackselection.TrackSelection.Definition;
-import com.google.android.exoplayer2.trackselection.TrackSelection.Factory;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection.Definition;
+import com.google.android.exoplayer2.trackselection.ExoTrackSelection.Factory;
+import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorManager;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 
 public class RestoreTrackSelector extends DefaultTrackSelector {
     private static final String TAG = RestoreTrackSelector.class.getSimpleName();
-    private static final int FORMAT_NOT_SUPPORTED = 19;
-    private static final int FORMAT_FORCE_SUPPORT = 52;
     private TrackSelectorCallback mCallback;
 
     public interface TrackSelectorCallback {
@@ -27,8 +27,13 @@ public class RestoreTrackSelector extends DefaultTrackSelector {
         void updateSubtitleTrackSelection(TrackGroupArray groups, Parameters params, Definition definition);
     }
 
-    public RestoreTrackSelector(Factory trackSelectionFactory) {
-        super(trackSelectionFactory);
+    /**
+     * A {@link Context} is now required: {@code DefaultTrackSelector} uses it to derive
+     * device-dependent defaults such as the display size, so the factory-only constructor was
+     * removed upstream.
+     */
+    public RestoreTrackSelector(Context context, Factory trackSelectionFactory) {
+        super(context, trackSelectionFactory);
         // Could help with Shield resolution bug?
         //setParameters(buildUponParameters().setForceHighestSupportedBitrate(true));
     }
@@ -120,17 +125,20 @@ public class RestoreTrackSelector extends DefaultTrackSelector {
     //    invalidate();
     //}
 
-    // Exo 2.10 and up
     @Nullable
     @Override
-    protected Definition selectVideoTrack(TrackGroupArray groups, int[][] formatSupports, int mixedMimeTypeAdaptationSupports,
-                                              Parameters params, boolean enableAdaptiveTrackSelection) throws ExoPlaybackException {
-        if (mCallback != null) {
+    protected Pair<Definition, Integer> selectVideoTrack(MappedTrackInfo mappedTrackInfo, int[][][] rendererFormatSupports,
+                                                         int[] rendererMixedMimeTypeAdaptationSupports,
+                                                         Parameters params) throws ExoPlaybackException {
+        int rendererIndex = findRendererIndex(mappedTrackInfo, C.TRACK_TYPE_VIDEO);
+
+        if (mCallback != null && rendererIndex != C.INDEX_UNSET) {
+            TrackGroupArray groups = mappedTrackInfo.getTrackGroups(rendererIndex);
             Pair<Definition, MediaTrack> resultPair = mCallback.onSelectVideoTrack(groups, params);
 
             if (resultPair != null) {
                 Log.d(TAG, "selectVideoTrack: choose custom video processing");
-                return resultPair.first;
+                return Pair.create(resultPair.first, rendererIndex);
             } else {
                 return null; // video disabled
             }
@@ -138,26 +146,30 @@ public class RestoreTrackSelector extends DefaultTrackSelector {
 
         Log.d(TAG, "selectVideoTrack: choose default video processing");
 
-        Definition definition = super.selectVideoTrack(groups, formatSupports, mixedMimeTypeAdaptationSupports, params, false);
+        Pair<Definition, Integer> result = super.selectVideoTrack(
+                mappedTrackInfo, rendererFormatSupports, rendererMixedMimeTypeAdaptationSupports, params);
 
         // Don't invoke if track already has been selected by the app
-        if (mCallback != null && definition != null) {
-            mCallback.updateVideoTrackSelection(groups, params, definition);
+        if (mCallback != null && result != null) {
+            mCallback.updateVideoTrackSelection(mappedTrackInfo.getTrackGroups(result.second), params, result.first);
         }
 
-        return definition;
+        return result;
     }
 
-    // Exo 2.10 and up
     @Nullable
     @Override
-    protected Pair<Definition, AudioTrackScore> selectAudioTrack(TrackGroupArray groups, int[][] formatSupports,
-                                                                 int mixedMimeTypeAdaptationSupports, Parameters params, boolean enableAdaptiveTrackSelection) throws ExoPlaybackException {
-        if (mCallback != null) {
+    protected Pair<Definition, Integer> selectAudioTrack(MappedTrackInfo mappedTrackInfo, int[][][] rendererFormatSupports,
+                                                         int[] rendererMixedMimeTypeAdaptationSupports,
+                                                         Parameters params) throws ExoPlaybackException {
+        int rendererIndex = findRendererIndex(mappedTrackInfo, C.TRACK_TYPE_AUDIO);
+
+        if (mCallback != null && rendererIndex != C.INDEX_UNSET) {
+            TrackGroupArray groups = mappedTrackInfo.getTrackGroups(rendererIndex);
             Pair<Definition, MediaTrack> resultPair = mCallback.onSelectAudioTrack(groups, params);
             if (resultPair != null) {
-                Log.d(TAG, "selectVideoTrack: choose custom audio processing");
-                return new Pair<>(resultPair.first, new AudioTrackScore(resultPair.second.format, params, RendererCapabilities.FORMAT_HANDLED));
+                Log.d(TAG, "selectAudioTrack: choose custom audio processing");
+                return Pair.create(resultPair.first, rendererIndex);
             } else {
                 return null; // audio disabled
             }
@@ -165,49 +177,64 @@ public class RestoreTrackSelector extends DefaultTrackSelector {
 
         Log.d(TAG, "selectAudioTrack: choose default audio processing");
 
-        Pair<Definition, AudioTrackScore> definitionPair = super.selectAudioTrack(groups, formatSupports,
-                mixedMimeTypeAdaptationSupports, params, false);
+        Pair<Definition, Integer> result = super.selectAudioTrack(
+                mappedTrackInfo, rendererFormatSupports, rendererMixedMimeTypeAdaptationSupports, params);
 
         // Don't invoke if track already has been selected by the app
-        if (mCallback != null && definitionPair != null) {
-            mCallback.updateAudioTrackSelection(groups, params, definitionPair.first);
+        if (mCallback != null && result != null) {
+            mCallback.updateAudioTrackSelection(mappedTrackInfo.getTrackGroups(result.second), params, result.first);
         }
 
-        return definitionPair;
+        return result;
     }
 
-    // Exo 2.10 and up
     @Nullable
     @Override
-    protected Pair<Definition, TextTrackScore> selectTextTrack(TrackGroupArray groups, int[][] formatSupport, Parameters params,
-                                                               @Nullable String selectedAudioLanguage) throws ExoPlaybackException {
-        if (mCallback != null) {
+    protected Pair<Definition, Integer> selectTextTrack(MappedTrackInfo mappedTrackInfo, int[][][] rendererFormatSupports,
+                                                        Parameters params,
+                                                        @Nullable String selectedAudioLanguage) throws ExoPlaybackException {
+        int rendererIndex = findRendererIndex(mappedTrackInfo, C.TRACK_TYPE_TEXT);
+
+        if (mCallback != null && rendererIndex != C.INDEX_UNSET) {
+            TrackGroupArray groups = mappedTrackInfo.getTrackGroups(rendererIndex);
             Pair<Definition, MediaTrack> resultPair = mCallback.onSelectSubtitleTrack(groups, params);
             if (resultPair != null) {
                 Log.d(TAG, "selectTextTrack: choose custom text processing");
-                return new Pair<>(resultPair.first, new TextTrackScore(resultPair.second.format, params, RendererCapabilities.FORMAT_HANDLED, ""));
+                return Pair.create(resultPair.first, rendererIndex);
             }
+            // NOTE: unlike video and audio, a null result falls through to the default selector
+            // rather than disabling the renderer. Preserved from the pre-migration behaviour.
         }
 
         Log.d(TAG, "selectTextTrack: choose default text processing");
 
-        Pair<Definition, TextTrackScore> definitionPair = super.selectTextTrack(groups, formatSupport, params, selectedAudioLanguage);
+        Pair<Definition, Integer> result = super.selectTextTrack(
+                mappedTrackInfo, rendererFormatSupports, params, selectedAudioLanguage);
 
         // Don't invoke if track already has been selected by the app
-        if (mCallback != null && definitionPair != null) {
-            mCallback.updateSubtitleTrackSelection(groups, params, definitionPair.first);
+        if (mCallback != null && result != null) {
+            mCallback.updateSubtitleTrackSelection(mappedTrackInfo.getTrackGroups(result.second), params, result.first);
         }
 
-        return definitionPair;
+        return result;
     }
 
-    private void unlockAllVideoFormats(int[][] formatSupports) {
-        final int videoTrackIndex = 0;
-
-        for (int j = 0; j < formatSupports[videoTrackIndex].length; j++) {
-            if (formatSupports[videoTrackIndex][j] == FORMAT_NOT_SUPPORTED) { // video format not supported by system decoders
-                formatSupports[videoTrackIndex][j] = FORMAT_FORCE_SUPPORT; // force support of video format
+    /**
+     * Finds the renderer handling a given track type.
+     *
+     * <p>The selection hooks now receive {@link MappedTrackInfo} covering every renderer rather than
+     * one renderer's track groups, so the index has to be resolved here. Derived from the renderer
+     * types rather than assuming the app's fixed 0/1/2 ordering, which only happens to hold because
+     * of the order {@code DefaultRenderersFactory} builds them in.
+     */
+    private static int findRendererIndex(MappedTrackInfo mappedTrackInfo, int trackType) {
+        for (int i = 0; i < mappedTrackInfo.getRendererCount(); i++) {
+            if (mappedTrackInfo.getRendererType(i) == trackType
+                    && mappedTrackInfo.getTrackGroups(i).length > 0) {
+                return i;
             }
         }
+
+        return C.INDEX_UNSET;
     }
 }

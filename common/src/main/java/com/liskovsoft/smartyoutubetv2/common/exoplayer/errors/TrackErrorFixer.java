@@ -3,7 +3,9 @@ package com.liskovsoft.smartyoutubetv2.common.exoplayer.errors;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
-import com.google.android.exoplayer2.source.DefaultMediaSourceEventListener;
+import com.google.android.exoplayer2.source.LoadEventInfo;
+import com.google.android.exoplayer2.source.MediaLoadData;
+import com.google.android.exoplayer2.source.MediaSourceEventListener;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.ContainerMediaChunk;
@@ -20,7 +22,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-public class TrackErrorFixer extends DefaultMediaSourceEventListener {
+/**
+ * Implements {@link MediaSourceEventListener} directly: the {@code DefaultMediaSourceEventListener}
+ * base class was removed upstream once every method on the interface gained a default
+ * implementation, making the adapter redundant.
+ */
+public class TrackErrorFixer implements MediaSourceEventListener {
     private static final int BLACKLIST_CHECK_MS = 1_000;
     private static final int BLACKLIST_CLEAR_MS = 10_000;
     private static final String TAG = TrackErrorFixer.class.getSimpleName();

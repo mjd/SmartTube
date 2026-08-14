@@ -5,6 +5,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.dash.DashSegmentIndex;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
+import com.google.android.exoplayer2.source.dash.manifest.BaseUrl;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
 import com.google.android.exoplayer2.source.dash.manifest.Descriptor;
@@ -319,7 +320,11 @@ public class LiveDashManifestParser extends DashManifestParser {
         private boolean mInitDone;
 
         public MultiSegmentRepresentationWrapper(MultiSegmentRepresentation origin, long segmentCount, long minUpdatePeriodMs) {
-            this(origin.revisionId, origin.format, origin.baseUrl, (SegmentList) Helpers.getField(origin, "segmentBase"), origin.inbandEventStreams);
+            // A Representation now carries a list of BaseUrls rather than a single String, and the
+            // constructor additionally takes essential and supplemental properties.
+            this(origin.revisionId, origin.format, origin.baseUrls,
+                    (SegmentList) Helpers.getField(origin, "segmentBase"),
+                    origin.inbandEventStreams, origin.essentialProperties, origin.supplementalProperties);
             mSegmentCount = segmentCount;
             mMinUpdatePeriodMs = minUpdatePeriodMs;
         }
@@ -327,10 +332,13 @@ public class LiveDashManifestParser extends DashManifestParser {
         public MultiSegmentRepresentationWrapper(
                 long revisionId,
                 Format format,
-                String baseUrl,
+                List<BaseUrl> baseUrls,
                 MultiSegmentBase segmentBase,
-                List<Descriptor> inbandEventStreams) {
-            super(revisionId, format, baseUrl, segmentBase, inbandEventStreams);
+                List<Descriptor> inbandEventStreams,
+                List<Descriptor> essentialProperties,
+                List<Descriptor> supplementalProperties) {
+            super(revisionId, format, baseUrls, segmentBase, inbandEventStreams,
+                    essentialProperties, supplementalProperties);
         }
 
         // DashSegmentIndex implementation.
@@ -366,7 +374,7 @@ public class LiveDashManifestParser extends DashManifestParser {
         }
 
         @Override
-        public int getSegmentCount(long periodDurationUs) {
+        public long getSegmentCount(long periodDurationUs) { // widened from int upstream
             init();
             return super.getSegmentCount(periodDurationUs);
         }

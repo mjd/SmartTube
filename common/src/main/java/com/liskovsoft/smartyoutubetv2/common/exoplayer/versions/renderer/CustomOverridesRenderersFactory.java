@@ -4,14 +4,9 @@ import android.content.Context;
 import android.os.Handler;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Renderer;
-import com.google.android.exoplayer2.audio.AudioCapabilities;
-import com.google.android.exoplayer2.audio.AudioProcessor;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
-import com.google.android.exoplayer2.audio.DefaultAudioSink;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
+import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
-import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.BlacklistMediaCodecSelector;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -48,8 +43,16 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
             setMediaCodecSelector(new BlacklistMediaCodecSelector());
         }
 
-        AmazonQuirks.disableSnappingToVsync(mPlayerTweaksData.isSnappingToVsyncDisabled());
-        AmazonQuirks.skipProfileLevelCheck(mPlayerTweaksData.isProfileLevelCheckSkipped());
+        // AmazonQuirks was an Amazon-port-only class that does not exist upstream, so its two
+        // settings had to find new homes.
+        //
+        // Profile/level check skipping is reimplemented in TweaksMediaCodecVideoRenderer via
+        // MediaCodecUtil.getDecoderInfosSoftMatch, which is upstream's equivalent.
+        //
+        // Vsync snapping has no equivalent: the quirk swapped in a Context-less
+        // VideoFrameReleaseTimeHelper, and its successor VideoFrameReleaseHelper is constructed
+        // internally by MediaCodecVideoRenderer with no hook to replace it. That setting is
+        // currently inert -- see MIGRATION_STATUS.md.
     }
 
     // 2.12, 2.13
@@ -117,14 +120,14 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
     //    replaceVideoRenderer(out, videoRenderer);
     //}
 
-    // 2.10, 2.11
+    // 2.12+ (DRM parameters and the AudioProcessor[] were dropped upstream; the audio sink is now
+    // passed in directly and built with DefaultAudioSink.Builder)
     @Override
     protected void buildAudioRenderers(Context context, @ExtensionRendererMode int extensionRendererMode, MediaCodecSelector mediaCodecSelector,
-                                       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager, boolean playClearSamplesWithoutKeys,
-                                       boolean enableDecoderFallback, AudioProcessor[] audioProcessors, Handler eventHandler,
+                                       boolean enableDecoderFallback, AudioSink audioSink, Handler eventHandler,
                                        AudioRendererEventListener eventListener, ArrayList<Renderer> out) {
-        super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys,
-                enableDecoderFallback, audioProcessors, eventHandler, eventListener, out);
+        super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector,
+                enableDecoderFallback, audioSink, eventHandler, eventListener, out);
 
         if ((mPlayerData.getAudioDelayMs() == 0 || !mPlayerData.isAudioDelayEnabled()) && !mPlayerTweaksData.isAudioSyncFixEnabled()) {
             // Improve performance a bit by eliminating calculations presented in custom renderer.
@@ -133,8 +136,8 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
         }
 
         DelayMediaCodecAudioRenderer audioRenderer =
-                new DelayMediaCodecAudioRenderer(context, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys, enableDecoderFallback,
-                        eventHandler, eventListener, new DefaultAudioSink(AudioCapabilities.getCapabilities(context), audioProcessors));
+                new DelayMediaCodecAudioRenderer(context, mediaCodecSelector, enableDecoderFallback,
+                        eventHandler, eventListener, audioSink);
 
         audioRenderer.setAudioDelayMs(mPlayerData.isAudioDelayEnabled() ? mPlayerData.getAudioDelayMs() : 0);
         audioRenderer.enableAudioSyncFix(mPlayerTweaksData.isAudioSyncFixEnabled());
@@ -142,22 +145,23 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
         replaceAudioRenderer(out, audioRenderer);
     }
 
-    // 2.10, 2.11
+    // 2.12+ (DRM parameters dropped upstream)
     @Override
     protected void buildVideoRenderers(Context context, int extensionRendererMode, MediaCodecSelector mediaCodecSelector,
-                                       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager, boolean playClearSamplesWithoutKeys,
                                        boolean enableDecoderFallback, Handler eventHandler, VideoRendererEventListener eventListener,
                                        long allowedVideoJoiningTimeMs, ArrayList<Renderer> out) {
-        super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys,
+        super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector,
                 enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, out);
         
-        if (!mPlayerTweaksData.isAmazonFrameDropFixEnabled() && !mPlayerTweaksData.isSonyFrameDropFixEnabled() && !mPlayerTweaksData.isAmlogicFixEnabled()) {
+        if (!mPlayerTweaksData.isAmazonFrameDropFixEnabled() && !mPlayerTweaksData.isSonyFrameDropFixEnabled() && !mPlayerTweaksData.isAmlogicFixEnabled()
+                && !mPlayerTweaksData.isMtkVp9AdaptationFixEnabled()
+                && !mPlayerTweaksData.isProfileLevelCheckSkipped()) {
             // Improve performance a bit by eliminating some if conditions presented in tweaks.
             // But we need to obtain codec real name somehow. So use interceptor below.
 
             DebugInfoMediaCodecVideoRenderer videoRenderer =
-                    new DebugInfoMediaCodecVideoRenderer(context, mediaCodecSelector, allowedVideoJoiningTimeMs, drmSessionManager,
-                        playClearSamplesWithoutKeys, enableDecoderFallback, eventHandler, eventListener, MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
+                    new DebugInfoMediaCodecVideoRenderer(context, mediaCodecSelector, allowedVideoJoiningTimeMs,
+                        enableDecoderFallback, eventHandler, eventListener, MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
 
             videoRenderer.enableSetOutputSurfaceWorkaround(true); // Force enable?
 
@@ -167,12 +171,14 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
         }
 
         TweaksMediaCodecVideoRenderer videoRenderer =
-                new TweaksMediaCodecVideoRenderer(context, mediaCodecSelector, allowedVideoJoiningTimeMs, drmSessionManager,
-                        playClearSamplesWithoutKeys, enableDecoderFallback, eventHandler, eventListener, MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
+                new TweaksMediaCodecVideoRenderer(context, mediaCodecSelector, allowedVideoJoiningTimeMs,
+                        enableDecoderFallback, eventHandler, eventListener, MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
 
         videoRenderer.enableFrameDropFix(mPlayerTweaksData.isAmazonFrameDropFixEnabled());
         videoRenderer.enableFrameDropSonyFix(mPlayerTweaksData.isSonyFrameDropFixEnabled());
         videoRenderer.enableAmlogicFix(mPlayerTweaksData.isAmlogicFixEnabled());
+        videoRenderer.enableMtkVp9AdaptationFix(mPlayerTweaksData.isMtkVp9AdaptationFixEnabled());
+        videoRenderer.skipProfileLevelCheck(mPlayerTweaksData.isProfileLevelCheckSkipped());
         videoRenderer.enableSetOutputSurfaceWorkaround(true); // Force enable?
 
         replaceVideoRenderer(out, videoRenderer);
