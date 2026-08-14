@@ -265,7 +265,15 @@ public class DashManifestParser2 {
         //UrlTemplate initializationTemplate = UrlTemplate.compile(format.getOtfInitUrl()); // ?
         UrlTemplate initializationTemplate = null; // ?
 
-        RangedUri initialization = parseRangedUrl(format.getSourceUrl(), format.getInit());
+        // Live formats carry no initialization range -- the header travels inside every segment --
+        // and fabricating one is actively harmful. parseRangedUrl with a null range covers the whole
+        // source url, which has no &sq= on it, so the server returns a complete copy of the current
+        // live segment. 2.19's InitializationChunk parses that into the real BaseMediaChunkOutput
+        // without ever calling setSampleOffsetUs (only ContainerMediaChunk does), so a whole
+        // segment's samples land in the queue in the segment's own time base, ~155 days out. The
+        // audio clock anchors to them, the position leaves the timeline and the picture freezes.
+        // 2.10.6 passed a null output here and discarded them, which is why the fork never showed it.
+        RangedUri initialization = format.getInit() != null ? parseRangedUrl(format.getSourceUrl(), format.getInit()) : null;
 
         List<SegmentTimelineElement> timeline = parseSegmentTimeline(offsetUnits, segmentDurationUnits, segmentCount);
 
