@@ -221,4 +221,9 @@ final class TestMediaFormat implements MediaFormat {
     public List<String> getGlobalSegmentList() {
         return null;
     }
+
+    @Override
+    public String getAudioTrackId() {
+        return null;
+    }
 }

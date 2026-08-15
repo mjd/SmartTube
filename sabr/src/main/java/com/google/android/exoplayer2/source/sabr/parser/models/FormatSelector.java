@@ -4,6 +4,7 @@ import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.Format;
 import com.liskovsoft.smartyoutubetv2.player.extras.FormatExtras;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.sabr.protos.misc.FormatId;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 
@@ -65,11 +66,33 @@ public class FormatSelector {
     }
 
     private static FormatId createFormatId(Format format) {
-        FormatId formatId = FormatId.newBuilder()
-                .setItag(Helpers.parseInt(format.id))
-                // lastModified now rides along as Metadata; see FormatExtras.
-                .setLastModified(FormatExtras.getLastModified(format.metadata, Format.NO_VALUE))
-                .build();
-        return formatId;
+        FormatId.Builder builder = FormatId.newBuilder()
+                .setItag(Helpers.parseInt(format.id));
+
+        // ExoPlayer uses -1 for an unset last-modified value. Encoding that
+        // sentinel produces an invalid SABR format tuple; protobuf's omitted/0
+        // default is what GoogleVideo uses when YouTube does not provide LMT.
+        // The value rides along as Metadata now, not a patched Format field;
+        // see FormatExtras.
+        long lastModified = FormatExtras.getLastModified(format.metadata, Format.NO_VALUE);
+        if (lastModified > 0) {
+            builder.setLastModified(lastModified);
+        }
+
+        if (format.metadata != null) {
+            for (int i = 0; i < format.metadata.length(); i++) {
+                Metadata.Entry entry = format.metadata.get(i);
+
+                if (entry instanceof SabrFormatMetadata) {
+                    String xTags = ((SabrFormatMetadata) entry).xTags;
+
+                    if (xTags != null && !xTags.isEmpty()) {
+                        builder.setXtags(xTags);
+                    }
+                }
+            }
+        }
+
+        return builder.build();
     }
 }
