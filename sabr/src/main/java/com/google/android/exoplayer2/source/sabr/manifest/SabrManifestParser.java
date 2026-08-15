@@ -8,15 +8,16 @@ import androidx.annotation.NonNull;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.liskovsoft.smartyoutubetv2.player.extras.FormatExtras;
-import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.sabr.manifest.SegmentBase.SegmentList;
 import com.google.android.exoplayer2.source.sabr.manifest.SegmentBase.SegmentTemplate;
 import com.google.android.exoplayer2.source.sabr.manifest.SegmentBase.SegmentTimelineElement;
 import com.google.android.exoplayer2.source.sabr.manifest.SegmentBase.SingleSegmentBase;
 import com.google.android.exoplayer2.source.sabr.protos.videostreaming.StreamerContext.ClientInfo;
 import com.google.android.exoplayer2.source.sabr.protos.videostreaming.StreamerContext.ClientName;
+import com.google.android.exoplayer2.source.sabr.parser.models.SabrFormatMetadata;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
@@ -390,6 +391,19 @@ public class SabrManifestParser {
                         isDrc,
                         lastModified);
 
+        if (!TextUtils.isEmpty(mediaFormat.getXtags())
+                || !TextUtils.isEmpty(mediaFormat.getAudioTrackId())) {
+            // copyWithMetadata is gone in 2.19. Append rather than replace: this Format's
+            // Metadata already carries the FormatExtras entry holding isDrc and lastModified,
+            // which the vendored player kept as extra Format fields.
+            Metadata extra = new Metadata(new SabrFormatMetadata(
+                    mediaFormat.getXtags(), mediaFormat.getAudioTrackId()));
+            format = format.buildUpon()
+                    .setMetadata(format.metadata != null
+                            ? format.metadata.copyWithAppendedEntriesFrom(extra) : extra)
+                    .build();
+        }
+
         SegmentBase segmentBase = null;
 
         if (MediaFormatUtils.isLiveMedia(baseUrl)) {
@@ -680,7 +694,7 @@ public class SabrManifestParser {
         MediaItemFormatInfo.ClientInfo clientInfo = formatInfo.getClientInfo();
 
         return ClientInfo.newBuilder()
-                .setClientName(ClientName.valueOf(clientInfo.getClientName()))
+                .setClientName(ClientName.valueOf(clientInfo.getClientName().toUpperCase()))
                 .setClientVersion(clientInfo.getClientVersion())
                 .setOsName(clientInfo.getOsName())
                 .setOsVersion(clientInfo.getOsVersion())
