@@ -36,11 +36,21 @@ CI (`.github/workflows/CI.yml`) runs, and all pass on `master`:
 
 ## Remaining before the Milestone A gate
 
-1. **32 reflection sites** into player internals, against a P4/P5 exit criterion of zero.
-   `LiveDashManifestParser` 26, `DelayMediaCodecAudioRenderer` 5, `TrackErrorFixer` 1. These fail
-   silently rather than at compile time, which is why CI ratchets them. `LiveDashManifestParser`
-   was meant to become an override-the-builders subclass of `DashManifestParser` and has not been
-   rewritten yet. Lower `REFLECTION_BASELINE` as they go.
+1. **31 reflection sites** into player internals, against a P4/P5 exit criterion of zero:
+   `LiveDashManifestParser` 26, `DelayMediaCodecAudioRenderer` 5. They fail silently rather than at
+   compile time, which is why CI ratchets them. Neither has a cheap exit:
+
+   - `LiveDashManifestParser` was meant to become an override-the-builders subclass of
+     `DashManifestParser`; the protected hooks it needs all exist in 2.19, so the rewrite is
+     feasible. But the path (`openDashUrl`, for videos with a DASH MPD and no adaptive formats)
+     never executed in any of our testing, so it cannot be validated on a device. It is also
+     probably already partly broken: `Representation` has no `segmentBase` field in 2.19 (only
+     `MultiSegmentRepresentation` does), and most write targets are now `final`.
+   - `DelayMediaCodecAudioRenderer` disables `AudioTrack.getTimestamp` by poking
+     `audioSink -> audioTrackPositionTracker -> audioTimestampPoller`. The whole chain still
+     resolves in 2.19, but **there is no public replacement** -- `DefaultAudioSink.Builder` has no
+     switch for the timestamp poller -- so P4's "construct the sink via the builder" does not apply
+     to this workaround.
 2. **Playback matrix on ≥3 devices**, plus APK size and cold-start-to-first-frame within 10% of
    pre-migration. Only the MediaTek Google TV has had real soak time.
 3. **Ship to beta.** Do not carry Milestone A unreleased into Milestone B.
