@@ -16,6 +16,7 @@ import java.util.List;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 
 public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRenderer {
     private static final String TAG = TweaksMediaCodecVideoRenderer.class.getSimpleName();
@@ -120,12 +121,21 @@ public class TweaksMediaCodecVideoRenderer extends DebugInfoMediaCodecVideoRende
         return codecInfo != null && DecoderQuirks.isSuspectMtkVp9Decoder(codecInfo.name);
     }
 
+    /**
+     * Traces every adaptation decision so the MediaTek VP9 guard above can be confirmed to fire on
+     * the affected hardware. Debug builds only: {@code Log.d} is not compiled out in release, and a
+     * release build has no use for it.
+     */
     private void logAdaptation(
             MediaCodecInfo codecInfo, Format oldFormat, Format newFormat,
             int result, boolean guardApplied) {
         long nowMs = SystemClock.elapsedRealtime();
         long sinceLastMs = mLastAdaptationMs == C.TIME_UNSET ? -1 : nowMs - mLastAdaptationMs;
         mLastAdaptationMs = nowMs;
+
+        if (!BuildConfig.DEBUG) {
+            return;
+        }
 
         Log.d(TAG, "Codec adaptation: %s | %s -> %s | keepCodec=%s%s | sinceLastMs=%s",
                 codecInfo != null ? codecInfo.name : "unknown",
