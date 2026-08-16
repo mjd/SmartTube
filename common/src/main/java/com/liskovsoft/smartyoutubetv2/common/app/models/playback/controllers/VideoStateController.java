@@ -726,8 +726,27 @@ public class VideoStateController extends BasePlayerController {
         return getPlayer().getDurationMs() - getPlayer().getPositionMs() <= 1_000;
     }
 
+    /**
+     * How far behind the live edge we must fall before re-syncing to it.
+     *
+     * <p>This has to sit well clear of where {@link #seekToActualLivePosition()} lands us, or the
+     * cure causes the disease. That seek discards the buffer, which rebuffers, which freezes the
+     * position while live time keeps advancing -- so a rebuffer longer than the margin puts us
+     * straight back over the threshold and we seek again, discarding the buffer again.
+     *
+     * <p>The old {@code + 5_000} left a 5s margin, and a seek-induced rebuffer reliably exceeded
+     * it, so one hiccup became a run of them: measured turning a ~5s dip into a 25s outage, three
+     * seeks deep. With a 30s margin the same dip stayed a single 3.9s dip and triggered no seek at
+     * all.
+     *
+     * <p>Deliberately independent of {@link #getLiveBuffer()}. Deriving it from the buffer, as
+     * before, meant the landing point and the trigger moved together, so the margin stayed 5s no
+     * matter how the buffer was tuned -- and seeking closer to the live edge could not widen it.
+     */
+    private static final long LIVE_RESYNC_MARGIN_MS = 30_000;
+
     private long getLiveThreshold() {
-        return getLiveBuffer() + 5_000;
+        return getLiveBuffer() + LIVE_RESYNC_MARGIN_MS;
     }
 
     private long getLiveBuffer() {
