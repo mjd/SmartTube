@@ -75,7 +75,10 @@ public class ExoPlayerInitializer {
         if (sAudioAttributes == null) {
             sAudioAttributes = new AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.CONTENT_TYPE_MOVIE)
+                    // C.CONTENT_TYPE_MOVIE still exists and holds the same value, but 2.19's
+                    // @C.AudioContentType IntDef only lists the AUDIO_ prefixed names, so lint
+                    // rejects the old one.
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
                     .build();
         }
 

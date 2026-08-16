@@ -1,6 +1,5 @@
 package com.liskovsoft.smartyoutubetv2.tv.ui.playback;
 
-import android.media.session.PlaybackState;
 import android.os.Build.VERSION;
 import android.os.Bundle;
 import android.support.v4.media.MediaMetadataCompat;
@@ -584,9 +583,13 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
             @Override
             public Boolean shouldForward(@NonNull Player player, @NonNull DoubleTapPlayerView playerView, float posX) {
-                if (player.getPlaybackState() == PlaybackState.STATE_ERROR ||
-                        player.getPlaybackState() == PlaybackState.STATE_NONE ||
-                        player.getPlaybackState() == PlaybackState.STATE_STOPPED) {
+                // These used to be android.media.session.PlaybackState constants, which share no
+                // numbering with Player.getPlaybackState(). Only STATE_STOPPED (1) ever matched,
+                // and it matched Player.STATE_IDLE -- ExoPlayer's single state for stopped, failed
+                // and not-yet-prepared. STATE_NONE (0) and STATE_ERROR (7) were unreachable. So
+                // this is the same behaviour, expressed in the right constant space; 2.19's
+                // stricter @Player.State made lint reject the old form.
+                if (player.getPlaybackState() == Player.STATE_IDLE) {
 
                     playerView.cancelInDoubleTapMode();
                     return false;
